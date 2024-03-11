@@ -1,0 +1,35 @@
+{
+  "name": "renderize",
+  "version": "2",
+  "description": "Renderize.js is a JavaScript library that facilitates flexible and dynamic rendering of HTML templates based on a provided array of objects. It supports various rendering types, lazy loading of images, flexible templating options and it offers various configuration options.",
+  "main": "autoload.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Aniq-Abid/Renderize.git"
+  },
+  "keywords": [
+    "Renderize",
+    "Custom Rendering",
+    "Data Rendering",
+    "Dynamic Templates",
+    "HTML Rendering",
+    "Grid View",
+    "List View",
+    "Table View",
+    "JavaScript Templating",
+    "Frontend Framework"
+  ],
+  "author": {
+    "name": "Aniq Abid",
+    "email": "aniqabid7@gmail.com"
+  },
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Aniq-Abid/Renderize/issues"
+  },
+  "homepage": "https://github.com/Aniq-Abid/Renderize#readme"
+}
+
