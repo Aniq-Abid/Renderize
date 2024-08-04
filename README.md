@@ -44,7 +44,7 @@ const renderize = new AutoLoad(data, viewContainer);
 
 // Configure Renderize settings
 renderize.config({
-  perPage: 20,
+  perLoad: 20,
   gridGap: "20px",
   // Add other configuration options
 });
@@ -58,7 +58,7 @@ renderize.listItemTemplate = `<div class="card">{/* ... */}</div>`;
 renderize.tableRowHtml = `<tr>{/* ... */}</tr>`;
 
 // For Errors
-console.log(renderize.errors);
+console.error(renderize.errors);
 ```
 ## Configuration Options for both AutoLoad and Pagination
 
@@ -66,14 +66,27 @@ console.log(renderize.errors);
 1. gridGap: Gap between grid items. Default is '10px'.
 2. gridItemMinWidth: Minimum width of grid items. Default is '200px'.
 3. gridItemWidth: Width of grid items or "fit" for dynamic width. Default is 'fit'.
+4. gridContainerClass: Class to be applied to the grid container. Default is 'data-view-grid'.
 
 ### List View Configuration:
 1. listGap: Gap between list items. Default is '10px'.
 2. listItemMinWidth: Minimum width of list items. Default is '500px'.
 3. listItemWidth: Width of list items or "fit" for dynamic width. Default is 'fit'.
+4. listContainerClass: Class to be applied to the list container. Default is 'data-view-list'.
+
+### List View Configuration:
+1. tableClass: Class to be applied to the table. Default is 'data-view-table'.
+
 
 ### Positioning:
-1. position: Position of the view (grid/list) within the container. Default is renderize.POSITIONS.LEFT. Position does not work with fit width.
+1. position: Position of the view (grid/list) within the container. Default is 'LEFT'. Position does not work with fit width.
+ POSTION OPTIONS:
+ 'LEFT',
+ 'CENTER',
+ 'RIGHT',
+ 'BETWEEN',
+ 'AROUND',
+ 'EVENLY'
 
 ### Search Configuration:
 1. searchIn: Column to search in. Default is 'all'.
@@ -100,7 +113,8 @@ console.log(renderize.errors);
 3. perLoad: Number of items per load. Default is 20.
 
 ### Auto-cleaning Configuration:
-1. autoCleanupWhen: When a container exceeds (autoCleanupWhen / 100) elements, the previous view container will be emptied when the view is changed.  Default is 100.
+1. autoCleanupWhen: When a container exceeds (autoCleanupWhen Default is 100) elements, the previous view container will be emptied when the view is changed.
+
 ## Configuration Options for Pagination. 
 
 ### Pagination:
@@ -110,6 +124,11 @@ console.log(renderize.errors);
 1. animation: Apply animation effect. Default is false.there are 2 types of animations "slide" and "fade"
 3. animationDuration: Duration of the animation. The default is '.5s' and the css variable --animation-duration in the animations.css file should also be set to animationDuration.
 
+**Note**
+To use the animation feature, make sure to include the corresponding animation CSS file in your project.
+```html
+<link rel="stylesheet" href="path/to/animations.css">
+```
 
 ## APIs Placeholders
 
@@ -155,12 +174,16 @@ console.log(renderize.errors);
 ### Parse for Every Row Placeholders ({%%}):
 1. {%column:column_name%} : Parse the value of the specified column.
 2. {%column:column_name[key]%} : Parse the value of a key within a column if the column is an array or object.
-3. {%column:column_name|upper%} : Capitalizes all letters in the column value.
-4. {%column:column_name|lower%} : Converts all letters in the column value to lowercase.
-5. {%column:column_name|firstCap%} : Capitalizes the first letter of the column value.
-6. {%column:title|length:20%} : Limits the length of the column value to 20 characters.
-7. {%column:column_name|formatNum%} : Formats the column value as a number with commas (e.g., 100000 becomes 100,000).
-8. {%counter%} : The counter is number of current iteration.
+
+3. {%counter%} : The counter is number of current iteration.
+
+### Filters:
+1. {%column:column_name|upper%} : Capitalizes all letters in the column value.
+2. {%column:column_name|lower%} : Converts all letters in the column value to lowercase.
+3. {%column:column_name|firstCap%} : Capitalizes the first letter of the column value.
+4. {%column:title|length:20%} : Limits the length of the column value to 20 characters.
+5. {%column:column_name|formatNum%} : Formats the column value as a number with commas (e.g., 100000 becomes 100,000).
+
 
 ### Conditional Rendering:
 
@@ -411,7 +434,7 @@ Return is necessary
 
 #### Code
 ```javascript
-renderize.afterSearching = (response) => {=
+renderize.afterSearching = (response) => {
   console.log("Searched.");
 
   // response = {
@@ -421,7 +444,6 @@ renderize.afterSearching = (response) => {=
   //   ]
   // }
   // if your data is like this then return response.data
-  // Because as you know only array object is allowed.
 
   return response;
 };
@@ -464,6 +486,48 @@ Exits the selection mode, concluding the interactive selection process.
 renderize.stopSelection();
 ```
 
+
+## beforeAutofetch()
+
+#### Description
+This is an event.The beforeAutofetch will trigger before requesting more data..
+
+#### Code
+
+```javascript
+renderize.beforeAutofetch = () => {
+  loaderContainer.classList.remove("hidden")
+  console.log("Fetching more elements...");
+};
+```
+
+## afterAutofetch(response)
+
+#### Parameters
+1. response (Json): the response which is fetched from API.
+
+#### Description
+This is an event.The afterAutofetch will trigger after fetching more data.
+Return is necessary
+
+#### Code
+
+```javascript
+renderize.afterAutofetch = (response) => {
+  loaderContainer.classList.add("hidden")
+  console.log("More elements are loaded.");
+
+  // response = {
+  //   success:true,
+  //   data:[
+  //     { /* ... */ },
+  //   ]
+  // }
+  // if your data is like this then return response.data
+
+  return response;
+};
+```
 
 
 ## Methods for Pagination
@@ -592,49 +656,16 @@ renderize.afterAutoload = () => {
 };
 ```
 
-## beforeAutofetch()
+## cleanUp()
 
 #### Description
-This is an event.The beforeAutofetch will trigger before requesting more data..
+Manually triggers the cleanup process to remove old elements from the container when the view is switched. Only applicable for AutoLoad.
 
 #### Code
 
 ```javascript
-renderize.beforeAutofetch = () => {
-  loaderContainer.classList.remove("hidden")
-  console.log("Fetching more elements...");
-};
+renderize.cleanUp();
 ```
-
-## afterAutofetch(response)
-
-#### Parameters
-1. response (Json): the response which is fetched from API.
-
-#### Description
-This is an event.The afterAutofetch will trigger after fetching more data.
-Return is necessary
-
-#### Code
-
-```javascript
-renderize.afterAutofetch = (response) => {
-  loaderContainer.classList.add("hidden")
-  console.log("More elements are loaded.");
-
-  // response = {
-  //   success:true,
-  //   data:[
-  //     { /* ... */ },
-  //   ]
-  // }
-  // if your data is like this then return response.data
-  // Because as you know only array object is allowed.
-
-  return response;
-};
-```
-
 
 ## Templator Class
 
@@ -778,8 +809,8 @@ export class Templator{
                 [formate,operation] = others.split("<");
             }
             if (Data[column]==undefined) {return;}
-            const data = parseInt(Data[column].replace(",",''));
-            if (value=="column") {value = Data[operationByColumn]}
+            const data = parseInt(Data[column]);
+            if (value=="column") {value = String(Data[operationByColumn])}
             switch (operation) {
                 case 'add':
                     let addBy = parseInt(value);
@@ -794,6 +825,11 @@ export class Templator{
                         subBy = (subBy / 100) * data
                     }
                     returnValue= data - subBy
+                    break;
+                case 'subpub':
+                    let subpubBy = parseInt(value);
+                    subpubBy = (subpubBy / 100) * data
+                    returnValue= data - subpubBy
                     break;
                 case 'mult':
                     let multBy = parseInt(value);
@@ -811,7 +847,7 @@ export class Templator{
                     break;
             }
             if (formate=="formateNum") {
-                returnValue = this.#templatingBasicMethods.formateNum(returnValue)                    
+                returnValue = this.#templatingBasicMethods.formatNum(returnValue)                    
             }
             return returnValue
         });
@@ -855,4 +891,65 @@ renderize.tableRowHtml = `<tr>{/* ... */}</tr>`;
 renderize.render();
 // For Errors
 console.log(renderize.errors);
+```
+
+### Placeholder
+1. **Addition (+)**
+Add values from another column or a static value.
+
+```
+{%column:price<add:column:discount>%} 
+{%column:price<add:10>%} 
+
+// with filter
+{%column:price|formateNum<add:column:discount>%} 
+{%column:price|formateNum<add:10>%}
+```
+
+2. **Subtraction (-)**
+Subtract values from another column or a static value.
+
+```
+{%column:price<sub:column:discount>%} 
+{%column:price<sub:10>%}
+
+// with filter
+{%column:price|formateNum<sub:column:discount>%} 
+{%column:price|formateNum<sub:10>%}
+```
+
+3. Multiplication (*)
+Multiply values from another column or a static value.
+
+```
+{%column:price<mult:column:discount>%} 
+{%column:price<mult:10>%} 
+
+// with filter
+{%column:price|formateNum<mult:column:discount>%} 
+{%column:price|formateNum<mult:10>%} 
+```
+
+4. Division (/)
+Divide values by another column or a static value.
+
+```
+{%column:price<div:column:discount>%} 
+{%column:price<div:10>%} 
+
+// with filter
+{%column:price|formateNum<div:column:discount>%} 
+{%column:price|formateNum<div:10>%} 
+```
+
+5. Subtract as a Percentage (- %)
+Subtract a percentage value from another column or a static value.
+
+```
+{%column:price<subpub:column:discount>%} 
+{%column:price<subpub:10>%} 
+
+// with filter
+{%column:price|formateNum<subpub:column:discount>%} 
+{%column:price|formateNum<subpub:10>%} 
 ```
