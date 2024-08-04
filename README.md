@@ -1,7 +1,7 @@
 
 # Renderize
 
-Renderize.js is a JavaScript library that facilitates flexible and dynamic rendering of HTML templates based on a provided array of objects. It supports various rendering types, lazy loading of images, flexible templating options and it offers various configuration options.
+**Renderize.js** is a JavaScript library that facilitates flexible and dynamic rendering of HTML templates based on a provided array of objects. It supports various rendering types, lazy loading of images, flexible templating options and it offers various configuration options.
 
 
 
@@ -846,7 +846,7 @@ export class Templator{
                     returnValue= data / divBy
                     break;
             }
-            if (formate=="formateNum") {
+            if (formate=="formatNum") {
                 returnValue = this.#templatingBasicMethods.formatNum(returnValue)                    
             }
             return returnValue
@@ -890,7 +890,7 @@ renderize.tableRowHtml = `<tr>{/* ... */}</tr>`;
 // Render the Renderize
 renderize.render();
 // For Errors
-console.log(renderize.errors);
+console.error(renderize.errors);
 ```
 
 ### Placeholder
@@ -901,9 +901,9 @@ Add values from another column or a static value.
 {%column:price<add:column:discount>%} 
 {%column:price<add:10>%} 
 
-// with filter
-{%column:price|formateNum<add:column:discount>%} 
-{%column:price|formateNum<add:10>%}
+// with formatNum filter
+{%column:price|formatNum<add:column:discount>%} 
+{%column:price|formatNum<add:10>%}
 ```
 
 2. **Subtraction (-)**
@@ -913,9 +913,9 @@ Subtract values from another column or a static value.
 {%column:price<sub:column:discount>%} 
 {%column:price<sub:10>%}
 
-// with filter
-{%column:price|formateNum<sub:column:discount>%} 
-{%column:price|formateNum<sub:10>%}
+// with formatNum filter
+{%column:price|formatNum<sub:column:discount>%} 
+{%column:price|formatNum<sub:10>%}
 ```
 
 3. Multiplication (*)
@@ -925,9 +925,9 @@ Multiply values from another column or a static value.
 {%column:price<mult:column:discount>%} 
 {%column:price<mult:10>%} 
 
-// with filter
-{%column:price|formateNum<mult:column:discount>%} 
-{%column:price|formateNum<mult:10>%} 
+// with formatNum filter
+{%column:price|formatNum<mult:column:discount>%} 
+{%column:price|formatNum<mult:10>%} 
 ```
 
 4. Division (/)
@@ -937,9 +937,9 @@ Divide values by another column or a static value.
 {%column:price<div:column:discount>%} 
 {%column:price<div:10>%} 
 
-// with filter
-{%column:price|formateNum<div:column:discount>%} 
-{%column:price|formateNum<div:10>%} 
+// with formatNum filter
+{%column:price|formatNum<div:column:discount>%} 
+{%column:price|formatNum<div:10>%} 
 ```
 
 5. Subtract as a Percentage (- %)
@@ -949,7 +949,7 @@ Subtract a percentage value from another column or a static value.
 {%column:price<subpub:column:discount>%} 
 {%column:price<subpub:10>%} 
 
-// with filter
-{%column:price|formateNum<subpub:column:discount>%} 
-{%column:price|formateNum<subpub:10>%} 
+// with formatNum filter 
+{%column:price|formatNum<subpub:column:discount>%} 
+{%column:price|formatNum<subpub:10>%} 
 ```
