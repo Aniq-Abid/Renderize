@@ -1,6 +1,6 @@
 {
   "name": "renderize",
-  "version": "2",
+  "version": "2.1.0",
   "description": "Renderize.js is a JavaScript library that facilitates flexible and dynamic rendering of HTML templates based on a provided array of objects. It supports various rendering types, lazy loading of images, flexible templating options and it offers various configuration options.",
   "main": "autoload.js",
   "scripts": {
