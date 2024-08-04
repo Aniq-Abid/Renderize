@@ -23,7 +23,11 @@ class Pagination {
     #listItemMinWidth;
     #listItemHtml = null;
     #listItemTagName = null;
-    // Search
+    // classes
+    #listContainerClass
+    #gridContainerClass
+    #tableClass
+    // search
     #searchContainer
     #searchContainerReConfig = true
     //
@@ -64,15 +68,6 @@ class Pagination {
             this.#data = Data
             this.dataLength = this.#data.length
         }
-        // positions 
-        this.POSITIONS = {
-            LEFT: "justify-content: flex-start;",
-            RIGHT: "justify-content: flex-end;",
-            CENTER: "justify-content: center;",
-            BETWEEN: "justify-content: space-between;",
-            AROUND: "justify-content: space-around;",
-            EVENLY: "justify-content: space-evenly;"
-        }
     }
     config(Options = {}) {
         this.#renderData = this.#data
@@ -96,11 +91,23 @@ class Pagination {
         this.#searchContainer = document.createElement('div');
         this.#searchContainer.id = 'ViewSearchContainer';
         this.#mainContainer.append(this.#searchContainer);
+        // class
+        this.#listContainerClass = Options.listContainerClass || 'data-view-list'
+        this.#gridContainerClass = Options.gridContainerClass || 'data-view-grid'
+        this.#tableClass = Options.tableClass || 'data-view-table' 
         // 
         this.#animation = Options.animation || false;
         this.#animationDuration = Options.animationDuration?.slice(0, -1) || '.5'
-        // 
-        this.#position = Options.position || this.POSITIONS.LEFT;
+        // positions 
+        const POSITIONS = {
+            LEFT: "justify-content: flex-start;",
+            RIGHT: "justify-content: flex-end;",
+            CENTER: "justify-content: center;",
+            BETWEEN: "justify-content: space-between;",
+            AROUND: "justify-content: space-around;",
+            EVENLY: "justify-content: space-evenly;"
+        }
+        this.#position = POSITIONS[Options.position] || POSITIONS['LEFT'];
         // 
         this.#totalPages = this.#calculateTotalPages();
         this.columns = Object.keys(this.#data[0]);
@@ -189,6 +196,9 @@ class Pagination {
             }
         }
     }
+    get viewContainer(){
+        return this.#viewContainer
+    }
     /**
      * @param {null} Html
      */
@@ -210,8 +220,7 @@ class Pagination {
         // 
         this.#listContainer = document.createElement('div');
         this.#listContainer.id = 'ViewListContainer';
-        this.listContainerClass = 'data-view-list';
-        this.#listContainer.className = this.listContainerClass;
+        this.#listContainer.className = this.#listContainerClass;
         this.#listContainer.style.display = "none";
         this.#listContainer.style.gap = this.#listGap;
         this.#listContainer.style.position = "relative";
@@ -239,8 +248,7 @@ class Pagination {
         // 
         this.#gridContainer = document.createElement('div');
         this.#gridContainer.id = 'ViewGridContainer';
-        this.gridContainerClass = 'data-view-grid';
-        this.#gridContainer.className = this.gridContainerClass;
+        this.#gridContainer.className = this.#gridContainerClass;
         this.#gridContainer.style.display = 'none';
         this.#gridContainer.style.gap = this.#gridGap;
         this.#gridContainer.style.position = "relative";
@@ -259,8 +267,7 @@ class Pagination {
         this.#tableContainer = document.createElement('table');
         this.#tableContainer.id = 'ViewTableContainer';
         this.#tableContainer.style.position = "relative";
-        this.tableClass = 'data-view-table table';
-        this.#tableContainer.className = this.tableClass;
+        this.#tableContainer.className = this.#tableClass;
         this.#tableContainer.createTBody();
         this.#tableContainer.style.display = 'none';
         this.#mainContainer.append(this.#tableContainer);
@@ -321,7 +328,7 @@ class Pagination {
                 this.#viewContainer = this.#tableContainer;
                 this.#viewContainer.style.display = "table";
             } else {
-                this.#tableContainer.style.display = "none";
+                this.#tableContainer ? this.#tableContainer.style.display = "none":'';
                 this.#searchContainerConfig(this.#view);
                 this.#viewContainer = this.#searchContainer;
                 this.#viewContainer.style.display = "grid";
@@ -390,14 +397,15 @@ class Pagination {
     async search(Query) {
         if (this.inSelection) { return "You are in Selection Mode"; }
         if (Query == "") {
-            if (this.#view == "grid") { this.#viewContainer = this.#gridContainer; this.#gridContainer.style.display = "grid" }
-            else if (this.#view == "list") { this.#viewContainer = this.#listContainer; this.#listContainer.style.display = "grid" }
-            else if (this.#view == "table") { this.#viewContainer = this.#tableContainer; this.#tableContainer.style.display = "table" }
+            let rerender;
+            if (this.#view == "grid") { this.#viewContainer = this.#gridContainer; this.#gridContainer.style.display = "grid";rerender =  this.#reRenderGrid}
+            else if (this.#view == "list") { this.#viewContainer = this.#listContainer; this.#listContainer.style.display = "grid";rerender =  this.#reRenderList }
+            else if (this.#view == "table") { this.#viewContainer = this.#tableContainer; this.#tableContainer.style.display = "table";rerender =  this.#reRenderTable }
             this.#searchContainer.style.display = "none";
             this.#renderData = this.#data;
             this.#searchCurrentPage = 1;
             this.#renderState = "main";
-            if (this.#reRenderGrid || this.#reRenderList || this.#reRenderTable) {
+            if (rerender) {
                 this.#lastRenderRow = this.#firstRenderRow;
                 this.#rendering();
             }
@@ -724,7 +732,9 @@ class Pagination {
         }
         // add Event Listener 
         this.#mainContainer.onclick = (e) => {
-            e.preventDefault()
+            if (!e.target.getAttribute("selection")) {
+                e.preventDefault();  
+            }
             let element;
             if (this.#viewContainer == this.#gridContainer) {
                 element = e.target.closest(`#ViewGridContainer > ${this.#gridItemTagName}`);
@@ -736,9 +746,9 @@ class Pagination {
             }
             if (element) {
                 const input = element.querySelector("input[selection]");
-                if (e.target == input) { return }
                 if (!input) { return; }
-                input.checked = !input.checked;
+                if (e.target != input) { input.checked = !input.checked; }
+                // 
                 const index = Number(input.getAttribute("selection"));
                 if (input.checked) {
                     this.selected.push({
@@ -812,7 +822,7 @@ class Pagination {
     jumpToPage(PageNumber) {
         if (this.inSelection) { return "You are in Selection Mode"; }
         if (this.#renderState == "main") {
-            this.#currentPage = PageNumber;
+            this.#currentPage = +PageNumber;
 
             this.#firstRenderRow = 0
 
@@ -1030,7 +1040,7 @@ class Templator {
             upper: (value) => value.toUpperCase(),
             lower: (value) => value.toLowerCase(),
             firstCap: (value) => value[0].toUpperCase() + value.slice(1).toLowerCase(),
-            length: (value, length) => value.slice(0, Number(length) + 1),
+            length: (value, length) => value.slice(0, Number(length)),
             formatNum: (value) => this.formatNum(value),
         };
     }
@@ -1130,13 +1140,19 @@ class Templator {
                 case "counter":
                     return NumberOfRow + 1
                 case "column":
-                    if (Data[name] == undefined) { return; }
                     const subKey = name.match(/\[([^)]+)\]/)
-                    const columnValue = subKey ? Data[name.slice(0, subKey?.index)][subKey[1]] : Data[name];
+                    let columnValue;
+                    if (subKey) {
+                        columnValue = Data[name.slice(0, subKey?.index)];
+                        columnValue = columnValue ? columnValue[subKey[1]] : columnValue;
+                    }else{
+                        columnValue = Data[name]
+                    }
+                    if (columnValue == undefined) { return ''; }
                     if (this.#formatters[formatter]) {
-                        return this.#formatters[formatter](columnValue);
+                        return this.#formatters[formatter](columnValue,formatterDynamic);
                     } else {
-                        return columnValue;
+                        return columnValue; 
                     }
             }
         });
