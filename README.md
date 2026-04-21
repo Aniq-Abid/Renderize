@@ -1,34 +1,35 @@
-
 # Renderize
 
-**Renderize.js** is a JavaScript library that facilitates flexible and dynamic rendering of HTML templates based on a provided array of objects. It supports various rendering types, lazy loading of images, flexible templating options and it offers various configuration options.
+**Renderize.js** is a JavaScript library that facilitates flexible and dynamic rendering of HTML templates based on a provided array of objects. It supports various rendering types, lazy loading of images, flexible templating options, skeleton/placeholder loading, auto-fetch, pagination, and auto-load — all with extensive configuration options.
 
-
+---
 
 ## Installation
 
-Install renderize with npm
-
 ```bash
-  npm i renderize
+npm i renderize
 ```
 
-## Include the Renderize library in your project:
-#### Import Autoload to use the Autoload feature. 
+## Include the Renderize library in your project
+
+#### Import AutoLoad to use the AutoLoad feature.
 
 ```javascript
-  import AutoLoad from 'renderize/autoload'
-```
-#### Import Pagination to use the Pagination feature. 
-```javascript
-  import Pagination from 'renderize/pagination'
+import AutoLoad from 'renderize/autoload'
 ```
 
-    
+#### Import Pagination to use the Pagination feature.
+
+```javascript
+import Pagination from 'renderize/pagination'
+```
+
+---
+
 ## Getting Started
 
 ```html
-<div id="viewContainer" ></div>
+<div id="viewContainer"></div>
 ```
 
 ```javascript
@@ -39,754 +40,690 @@ let data = [
 ];
 
 // Initialize Renderize
-const viewContainer = document.getElementById("viewContainer")
-const renderize = new AutoLoad(data, viewContainer);
+const viewContainer = document.getElementById("viewContainer");
+const renderize = new AutoLoad(viewContainer, data);
 
 // Configure Renderize settings
+// Note: view must be set here in config, not in render() or loading()
 renderize.config({
   perLoad: 20,
   gridGap: "20px",
+  view: "grid",
   // Add other configuration options
 });
 
-// Set templates for grid views
-renderize.gridItemTemplate = `<div class="card">{/* ... */}</div>`;
-// Render HTML 
+// Set templates for grid, list, and table views
+renderize.gridItemTemplate = `<div class="card"> ... </div>`;
+renderize.listItemTemplate = `<div class="card"> ... </div>`;
+renderize.tableRowHtml = `<tr> ... </tr>`;
+
+// Render HTML
 renderize.render();
-// Set templates for list and table views
-renderize.listItemTemplate = `<div class="card">{/* ... */}</div>`;
-renderize.tableRowHtml = `<tr>{/* ... */}</tr>`;
 
 // For Errors
 console.error(renderize.errors);
 ```
-## Configuration Options for both AutoLoad and Pagination
 
-### Grid View Configuration:
-1. gridGap: Gap between grid items. Default is '10px'.
-2. gridItemMinWidth: Minimum width of grid items. Default is '200px'.
-3. gridItemWidth: Width of grid items or "fit" for dynamic width. Default is 'fit'.
-4. gridContainerClass: Class to be applied to the grid container. Default is 'data-view-grid'.
+> **Important:** The `view` type must be set inside `config({ view: 'grid' })`. Do not attempt to set the view inside `render()` or `loading()`.
 
-### List View Configuration:
-1. listGap: Gap between list items. Default is '10px'.
-2. listItemMinWidth: Minimum width of list items. Default is '500px'.
-3. listItemWidth: Width of list items or "fit" for dynamic width. Default is 'fit'.
-4. listContainerClass: Class to be applied to the list container. Default is 'data-view-list'.
+---
 
-### List View Configuration:
-1. tableClass: Class to be applied to the table. Default is 'data-view-table'.
+## Configuration Options (AutoLoad and Pagination)
 
+### Debug Configuration
 
-### Positioning:
-1. position: Position of the view (grid/list) within the container. Default is 'LEFT'. Position does not work with fit width.
- POSTION OPTIONS:
- 'LEFT',
- 'CENTER',
- 'RIGHT',
- 'BETWEEN',
- 'AROUND',
- 'EVENLY'
+1. **debug**: Whether to enable debug mode. When `true`, basic validations run on templates and config URLs like `apiSearching`, `dataApiUrl`, and item templates — and error messages are pushed to `renderize.errors`. Some validations still apply even when `false`. Default is `true`.
 
-### Search Configuration:
-1. searchIn: Column to search in. Default is 'all'.
-2. searchCaseSensitive: Whether the search is case-sensitive. Default is false.
-3. apiSearching: Enable searching through an API. Default is false.
-4. searchApi: API endpoint for searching. Default is an empty string.
-5. searchApiOptions: Fetch API Options. Default is Object. example : { headers: {"Content-Type": "application/json"} }.
+### Skeleton / Placeholder Loading Configuration
 
-### Auto-fetch Configuration:
-1. autoFetch: Whether to fetch more data after rendering. Default is false.
-2. autoFetchWhen: Number of items remaining before triggering auto-fetch. Default is 40.
-3. dataApiUrl: API endpoint for fetching additional data. Default is an empty string.
-4. dataApiOptions: Fetch API Options. Default is Object. example : { headers: {"Content-Type": "application/json"} }.
+1. **loadingClass**: Class applied to placeholder elements. Default is `'placeholder'`. You may provide multiple classes separated by a space (e.g., `'placeholder skeleton'`).
+2. **loadingPerPage**: Number of placeholder items rendered per page (Pagination only). Default is the value of `perPage`.
+3. **loadingPerLoad**: Number of placeholder items rendered per load (AutoLoad only). Default is the value of `perLoad`.
 
-### Lazy Loading Image:
-1. lazyloadImageColor: Background color for lazy-loaded images. Default is 'linear-gradient(45deg, white 0%, black 59%)'.
+**Placeholder attributes in your HTML template:**
 
+Use `data-placeholder` on any element to mark it as a skeleton target. You can apply inline styles exclusively for the loading state using `data-`-prefixed style attributes:
 
-## Configuration Options for AutoLoad. 
-
-### Auto-loading Configuration:
-1. autoload: Whether to load more data automatically. Default is false.
-2. autoloadWhen: Number of items remaining before triggering autoload. Default is 5 means fifth last.
-3. perLoad: Number of items per load. Default is 20.
-
-### Auto-cleaning Configuration:
-1. autoCleanupWhen: When a container exceeds (autoCleanupWhen Default is 100) elements, the previous view container will be emptied when the view is changed.
-
-## Configuration Options for Pagination. 
-
-### Pagination:
-1. perPage: Number of items per page. Default is 20.
-
-### Animation:
-1. animation: Apply animation effect. Default is false.there are 2 types of animations "slide" and "fade"
-3. animationDuration: Duration of the animation. The default is '.5s' and the css variable --animation-duration in the animations.css file should also be set to animationDuration.
-
-**Note**
-To use the animation feature, make sure to include the corresponding animation CSS file in your project.
 ```html
-<link rel="stylesheet" href="path/to/animations.css">
+<div data-placeholder data-width="100%" data-height="90px" data-display="block" data-border-radius="8px">
+  Content here
+</div>
 ```
 
-## APIs Placeholders
+Any CSS property can be applied via `data-{property}` and it will only be active during the placeholder/loading phase. Use `data-placeholder-remove` to remove an element entirely during the loading phase:
 
-### For dataApiUrl:
-1. {last:index} or {last}: Represents the last index fetched, allowing you to fetch data starting from the last index. For example, if the last index is 40, it will fetch data starting from index 39.
+```html
+<button data-placeholder-remove>Add to Cart</button>
+```
 
-2. {last:counter}: Represents the last counter/row/length fetched, enabling you to fetch data starting from the last counter. For instance, if the last counter is 40, it will fetch data starting from counter 40.
+You can also use a self-closing `<placeholder>` tag directly inside your template to insert a placeholder-only element:
 
-3. {last:column}: Represents the last index column, letting you fetch data starting from the last index column.
+```html
+<placeholder data-width="60px" data-height="20px" />
+```
 
-4. {perPage}: Represents the number of items per page, helping in paginating the API request. It allows dynamic control over the number of items fetched. for only Pagination
+Use `data-placeholder-dark` instead of `data-placeholder` to apply a darker variant class (`loadingClass-dark`) for dark-themed skeletons.
 
-5. {perLoad}: Represents the number of items per load, helping in paginating the API request. It allows dynamic control over the number of items fetched. for only AutoLoad
+### Grid View Configuration
 
-### For searchApi:
-1. {query}: Represents the search query for simple searches.
+1. **gridGap**: Gap between grid items. Default is `'10px'`.
+2. **gridItemMinWidth**: Minimum width of grid items. Default is `'200px'`. Percentage values are not allowed.
+3. **gridItemWidth**: Width of grid items, or `"fit"` for dynamic width. Default is `'fit'`. Percentage values are not allowed.
+4. **gridContainerClass**: Class applied to the grid container. Default is `'data-view-grid'`. Multiple classes can be provided separated by a space.
 
-2. {searchCaseSensitive}: Represents whether the search is case-sensitive. It returns true or false.
+### List View Configuration
 
-3. {column}: Represents the column on which the search is performed. It returns the value set in the searchIn configuration.
+1. **listGap**: Gap between list items. Default is `'10px'`.
+2. **listItemMinWidth**: Minimum width of list items. Default is `'500px'`. Percentage values are not allowed.
+3. **listItemWidth**: Width of list items, or `"fit"` for dynamic width. Default is `'fit'`. Percentage values are not allowed.
+4. **listContainerClass**: Class applied to the list container. Default is `'data-view-list'`. Multiple classes can be provided separated by a space.
 
-4. {last:index} or {last}: Represents the last index fetched, allowing you to fetch data starting from the last index. For example, if the last index is 40, it will fetch data starting from index 39.
+### Table View Configuration
 
-5. {last:counter}: Represents the last counter/row/length fetched, enabling you to fetch data starting from the last counter. For instance, if the last counter is 40, it will fetch data starting from counter 40.
+1. **tableClass**: Class applied to the table element. Default is `'data-view-table'`. Multiple classes can be provided separated by a space (e.g., `'table table-striped'`).
 
-6. {last:column}: Represents the last index column, letting you fetch data starting from the last index column.
+### Positioning
 
-7. {perPage}: Represents the number of items per page, helping in paginating the API request. It allows dynamic control over the number of items fetched. for only Pagination
+1. **position**: Alignment of items within the grid or list container. Does not apply when using fit width. Default is `'LEFT'`.
 
-8. {perLoad}: Represents the number of items per load, helping in paginating the API request. It allows dynamic control over the number of items fetched. for only AutoLoad
+Available options: `'LEFT'`, `'CENTER'`, `'RIGHT'`, `'BETWEEN'`, `'AROUND'`, `'EVENLY'`
+
+### Search Configuration
+
+1. **searchBody**: Default body/params injected into all search API requests. Can also be set at any time via `renderize.searchBody = { keyword: "" }` or passed directly to the `search()` method.
+2. **searchIn**: Column to search in for local searching. Default is `'all'`. (Replaces the deprecated `column` placeholder.)
+3. **searchCaseSensitive**: Whether local search is case-sensitive. Default is `false`.
+4. **apiSearching**: Enable server-side searching through an API. Default is `false`. When `false`, searching is **local** — Renderize searches across the data it already holds.
+5. **searchApiUrl**: API URL for server-side searching. Default is `''`. POST method is also supported.
+6. **searchApiOptions**: Fetch API options for search requests. Default is `{}`. Example: `{ headers: { "Content-Type": "application/json" } }`.
+
+### Auto-fetch Configuration
+
+1. **autoFetch**: Whether to automatically fetch more data from the API as data runs low. Default is `false`. If `fetchedDataLength` is provided, Renderize manages this automatically — you do not need to set `autoFetch` manually.
+2. **autoFetchWhen**: The number of unrendered items to maintain in the buffer before triggering an auto-fetch. For example, if set to `40`, Renderize ensures there are always at least 40 upcoming rows pre-fetched. Default is `40`.
+3. **dataApiUrl**: API URL for fetching additional data. Default is `''`. POST method is also supported.
+4. **dataApiOptions**: Fetch API options for data fetch requests. Default is `{}`. Example: `{ headers: { "Content-Type": "application/json" } }`.
+5. **dataBody**: Body/params passed with auto-fetch data API requests. Supports API Placeholders (see below).
+6. **fetchedDataLength**: Optional. When set to a number, Renderize automatically manages `autoFetch` based on the API response length. If the API returns fewer records than `fetchedDataLength`, it means no more data is available — Renderize stops further auto-fetch requests automatically. Default is `false`.
+
+   Example: Set `fetchedDataLength: 30`. If the API is expected to return 30 records per request but only returns 12, Renderize knows the data source is exhausted and disables further fetching automatically.
+
+### Lazy Load Image
+
+1. **lazyloadImageColor**: Background color shown while a lazy-loaded image is loading. Default is `'#eee'`.
+
+---
+
+## Configuration Options for AutoLoad
+
+### Auto-loading Configuration
+
+1. **autoload**: Whether to automatically load more data as the user scrolls. Default is `true`. **This option only applies to the AutoLoad class.**
+2. **autoloadWhen**: Number of items from the end of the list that triggers the next load. Default is `10`.
+3. **autoloadMargin**: IntersectionObserver `rootMargin` value that controls how far ahead of the scroll trigger the load fires. Default is `'0px'`. Example: `'200px'` to load earlier.
+4. **perLoad**: Number of items per load. Default is `20`.
+
+### Auto-cleaning Configuration
+
+1. **autoCleanupWhen**: When the rendered item count in a view container exceeds this number, the previous container is emptied when switching views. Default is `100`.
+
+---
+
+## Configuration Options for Pagination
+
+### Pagination
+
+1. **perPage**: Number of items per page. Default is `20`.
+
+### Animation
+
+1. **animation**: Apply a page-change animation effect. Default is `false`. Options: `"slide"`, `"fade"`.
+2. **animationDuration**: Duration of the animation. Default is `'.5s'`. The CSS variable `--animation-duration` in `animations.css` should also be set to match.
+
+**Note:** To use animations, include the animations CSS file:
+
+```html
+<link rel="stylesheet" href="path/to/renderize/animations.css">
+```
+
+---
+
+## API Placeholders
+
+These placeholders are resolved dynamically when building API request URLs or bodies.
+
+### For `dataApiUrl` / `dataBody`
+
+| Placeholder | Description |
+|---|---|
+| `{last}` or `{last:index}` | The last index of the current dataset. E.g. if you have 40 items, returns `39`. |
+| `{last:counter}` | The last counter/length of the current dataset. E.g. if you have 40 items, returns `40`. |
+| `{last:column}` | The value of a specific column from the last fetched row. Replace `column` with your column name. |
+| `{perLoad}` | The current value of `perLoad` (AutoLoad only). |
+| `{perPage}` | The current value of `perPage` (Pagination only). |
+| `{nextPage}` | The next required page number. Calculated as `totalPages + 1`. For example, if Renderize has calculated 5 pages from the existing data, `{nextPage}` returns `6`. Works in both AutoLoad and Pagination. |
+
+### For `searchApiUrl` / `searchBody`
+
+| Placeholder | Description |
+|---|---|
+| `{query}` | The search query string (used for local search key as well). |
+| `{searchCaseSensitive}` | Whether the search is case-sensitive. Returns `true` or `false`. |
+| `{searchIn}` | The column being searched. Returns the `searchIn` config value. |
+| `{last}` or `{last:index}` | Same as above. |
+| `{last:counter}` | Same as above. |
+| `{last:column}` | Same as above. |
+| `{perLoad}` | The current `perLoad` value (AutoLoad only). |
+| `{perPage}` | The current `perPage` value (Pagination only). |
+| `{nextPage}` | The next required page based on internal search state `totalPages`. Resets on each new search. |
+
+---
 
 ## Templating Engine
 
-### One-time Parse Placeholders ({{}}):
-1. {{date:d}}: Parse the current day of the month (e.g., 30).
-2. {{date:m}} : Parse the current month (e.g., 6).
-3. {{date:y}} : Parse the current year (e.g., 2023).
-4. {{time:h}} : Parse the current hour (e.g., 3).
-5. {{time:m}} : Parse the current minute (e.g., 43).
-6. {{time:s}} : Parse the current second (e.g., 30).
-7. {{loadimage|height|width?optional|img_tag}} : Lazy loads an image with specified height and width. width is optional
+### One-time Parse Placeholders (`{{}}`)
 
-### Parse for Every Row Placeholders ({%%}):
-1. {%column:column_name%} : Parse the value of the specified column.
-2. {%column:column_name[key]%} : Parse the value of a key within a column if the column is an array or object.
+Evaluated once when the template is first registered.
 
-3. {%counter%} : The counter is number of current iteration.
+| Placeholder | Description |
+|---|---|
+| `{{date:d}}` | Current day of the month (e.g., `30`). |
+| `{{date:m}}` | Current month (e.g., `6`). |
+| `{{date:y}}` | Current year (e.g., `2024`). |
+| `{{time:h}}` | Current hour. |
+| `{{time:m}}` | Current minute. |
+| `{{time:s}}` | Current second. |
+| `{{loadimage\|height\|width?\|img_tag}}` | Lazy loads an image. Width is optional. |
 
-### Filters:
-1. {%column:column_name|upper%} : Capitalizes all letters in the column value.
-2. {%column:column_name|lower%} : Converts all letters in the column value to lowercase.
-3. {%column:column_name|firstCap%} : Capitalizes the first letter of the column value.
-4. {%column:title|length:20%} : Limits the length of the column value to 20 characters.
-5. {%column:column_name|formatNum%} : Formats the column value as a number with commas (e.g., 100000 becomes 100,000).
+### Per-row Placeholders (`{%% %}`)
 
+Evaluated for every data row during rendering.
 
-### Conditional Rendering:
+| Placeholder | Description |
+|---|---|
+| `{%column:column_name%}` | Value of the specified column. |
+| `{%column:column_name[key]%}` | Value of a key inside a column if the column is an object or array. |
+| `{%counter%}` | The current row's 1-based iteration number. |
 
+### Filters
 
-#### Description
-Conditional rendering is performed with column only and without the comparison, logical, bitwise operator. else statement is required
+Append filters after a `|` in column placeholders.
 
-#### Code
+| Filter | Description |
+|---|---|
+| `{%column:column_name\|upper%}` | Converts all letters to uppercase. |
+| `{%column:column_name\|lower%}` | Converts all letters to lowercase. |
+| `{%column:column_name\|firstCap%}` | Capitalizes the first letter. |
+| `{%column:title\|length:20%}` | Limits value to specified number of characters. Change `20` to any number. |
+| `{%column:column_name\|formatNum%}` | Formats number with commas (e.g., `100000` → `100,000`). |
 
-```javascript
+### Conditional Rendering
+
+Condition is evaluated against the column value (truthy/falsy). The `{%else%}` block is required.
+
+```html
 {%if column:column_name %}
-  <button class="btn-sm btn-primary">Add</button>
+  <button class="btn btn-primary">Add</button>
 {%else%}
-  <button class="btn-sm btn-danger">Delete</button>
+  <button class="btn btn-danger">Delete</button>
 {%endif%}
 ```
 
-### Lazy Load Image Examples:
-1. {{loadimage|40px|40px|<img ...>}} : Lazy loads an image with a specified height and width (40px x 40px) using an img tag.
-2. {{loadimage|40px|<img ...>}} : Lazy loads an image with a specified height (40px) and uses an img tag.
+### Lazy Load Image Examples
 
-### Template Example:
 ```javascript
-// Example data 
-data = [
-  { img: "example.png", title: 'Example Title', price: '120000', rating: 5, brand: "example", discount: "30%",liked:true},
-]
-// Set template for grid views
-dataView.gridItemTemplate = `<div class="card custom-card">
-<span class="badge bg-primary" style="position: absolute;top: 10px;right: 10px;">{%counter%}</span>
+{{loadimage|40px|40px|<img src="..." class="..." alt="...">}}
+{{loadimage|40px|<img src="..." class="..." alt="...">}}
+```
 
-{{loadimage|120px|100%|<img src="images/{%column:img%}" class="card-img-top" alt="Product Image" loading="lazy">}}
+### Template Example
 
-<div class="card-body">
+```javascript
+// Sample data
+let data = [
+  {
+    img: "example.png",
+    title: 'Example Title',
+    price: '120000',
+    rating: 5,
+    brand: "example",
+    discount: "30%",
+    liked: true
+  },
+];
+
+// Initialize Renderize
+const viewContainer = document.getElementById("viewContainer");
+const renderize = new AutoLoad(viewContainer, data);
+
+renderize.config({
+  perLoad: 20,
+  gridGap: "20px",
+  view: "grid",
+});
+
+// Set template for grid view
+renderize.gridItemTemplate = `<div class="card custom-card">
+  <span class="badge bg-primary" style="position: absolute; top: 10px; right: 10px;">{%counter%}</span>
+
+  {{loadimage|120px|100%|<img src="images/{%column:img%}" class="card-img-top" alt="Product Image" loading="lazy">}}
+
+  <div class="card-body">
     <h5 class="card-title">{%column:title|firstCap%}</h5>
     <div class="card-badge">
-        <span class="badge bg-primary">{%column:brand|upper%}</span>
+      <span class="badge bg-primary">{%column:brand|upper%}</span>
     </div>
     <div class="card-details">
-        <div class="price-rating">
-            <span class="price">Rs{%column:price|formatNum%}</span>
-            <span class="rating">Rating: {%column:rating%}</span>
-        </div>
+      <div class="price-rating">
+        <span class="price">Rs{%column:price|formatNum%}</span>
+        <span class="rating">Rating: {%column:rating%}</span>
+      </div>
     </div>
     <div class="d-flex justify-content-end">
       {%if column:liked %}
-      <button class="btn-sm btn-primary">Liked</button>
+        <button class="btn-sm btn-primary">Liked</button>
       {%else%}
-      <button class="btn-sm btn-dark">Like</button>
+        <button class="btn-sm btn-dark">Like</button>
       {%endif%}
     </div>
-</div>
+  </div>
 </div>`;
+
+renderize.render();
 ```
+
+---
 
 ## Constructors
-#### Pagination Constructor
 
-## new Pagination(Data, Container)
+### `new AutoLoad(Container, Data = [])`
 
-#### Parameters
-1. Data (Array): An array of objects representing the data to be displayed.
-2. Container (HTMLElement): The HTML element that will serve as the container for the Renderize.
-
-#### Description
-Initializes a new Pagination Functionality.
-
-#### Code
+| Parameter | Type | Description |
+|---|---|---|
+| `Container` | HTMLElement | The HTML container element. |
+| `Data` | Array | (Optional) Array of objects to render. Can be omitted if loading data from an API — use `updateData()` after fetching. |
 
 ```javascript
-const renderize = new Pagination(data, container);
+const renderize = new AutoLoad(container);
+// or
+const renderize = new AutoLoad(container, data);
 ```
 
-#### AutoLoad Constructor
+### `new Pagination(Container, Data = [])`
 
-## new AutoLoad(Data, Container)
-
-#### Parameters
-1. Data (Array): An array of objects representing the data to be displayed.
-2. Container (HTMLElement): The HTML element that will serve as the container for the Renderize.
-
-#### Description
-Initializes a new AutoLoad Functionality.
-
-#### Code
+| Parameter | Type | Description |
+|---|---|---|
+| `Container` | HTMLElement | The HTML container element. |
+| `Data` | Array | (Optional) Array of objects to render. Can be omitted if loading data from an API — use `updateData()` after fetching. |
 
 ```javascript
-const renderize = new AutoLoad(data, container);
+const renderize = new Pagination(container);
+// or
+const renderize = new Pagination(container, data);
 ```
 
-## Methods for both AutoLoad and Pagination
+> **Tip:** Omitting `Data` is useful when you want to show a skeleton loading state immediately, then fetch data from an API and load it afterward:
+>
+> ```javascript
+> const renderize = new AutoLoad(container);
+> renderize.config({ view: "grid", /* ... */ });
+> renderize.gridItemTemplate = `...`;
+> renderize.loading(); // show skeleton
+>
+> fetch("https://api.example.com/items")
+>   .then(res => res.json())
+>   .then(data => {
+>     renderize.updateData(() => data.items);
+>     renderize.load();
+>   });
+> ```
 
-## config(Options)
+---
 
-#### Parameters
-1. Options (Object): An object containing configuration options for the Renderize.
+## Methods (AutoLoad and Pagination)
 
-#### Description
-Configures various options for the Rendering, allowing customization of its behavior.
+### `config(Options)`
 
-
-#### Code
+Configures all rendering options. Must be called before setting templates or rendering.
 
 ```javascript
 renderize.config({
-  autoload: true,
+  view: "grid",
+  perLoad: 20,
   autoFetch: true,
-  dataApiUrl: "https://api.example.com",
+  dataApiUrl: "https://api.example.com/items",
   animation: "fade",
-  // Other options...
 });
 ```
 
-## render(View)
+### `render()`
 
-#### Parameters
-1. View (String): The view to set for rendering data (e.g., "grid", "list", "table"). Default is "grid"
-
-
-#### Description
-Render the data.     
-
-#### Code
+Renders the data from the beginning (first page / first load).
 
 ```javascript
 renderize.render();
 ```
 
-## gridItemTemplate(Html)
+### `loading()`
 
-#### Parameters
-1. Html (String): The HTML template for each grid item. 
+Renders skeleton/placeholder items based on the active template. Call this **before** data is available to show a loading state. Combine with `load()` once data is ready.
 
-#### Type
-Setter
+```javascript
+// Show loading skeletons
+renderize.loading();
 
-#### Description
-Sets the template for grid items, allowing customization of the visual representation.
+// Later, when data arrives:
+renderize.load();
+```
 
+`loading()` can also be called inside `beforeAutofetch` to show placeholders during background fetches.
 
-#### Code
+### `load()`
+
+Renders newly updated data when placeholders are active, or when new API data has arrived. Also acts as a manual "load more" trigger when `autoload` is disabled.
+
+```javascript
+renderize.load();
+```
+
+### `removeLoading()`
+
+Manually removes any active skeleton/placeholder loading elements from the view container. Useful when you need to cancel a loading state or if an API request fails.
+
+```javascript
+renderize.removeLoading();
+```
+
+### `search(Body)`
+
+Searches for data based on the provided body/params. Updates the displayed results.
+
+For **local searching** (default when `apiSearching` is `false`), pass `{ query: 'your search text' }`. Renderize searches across the data it already holds.
+
+For **API searching**, pass the full body/params your API expects.
+
+```javascript
+// Local search
+renderize.search({ query: "example" });
+
+// API search with custom params
+renderize.search({ q: "example", limit: 20, page: "{nextPage}" });
+```
+
+> **Note:** `search()` is prohibited when Selection Mode is active.
+
+### `resetSearch()`
+
+Exits the search state and returns to the main data view without overriding manually managed data.
+
+```javascript
+renderize.resetSearch();
+```
+
+### `updateData(Callback)`
+
+Updates the internal data array. The callback receives the current data and should return the new data.
+
+```javascript
+renderize.updateData((currentData) => {
+  return newDataArray;
+});
+```
+
+### `gridItemTemplate` (setter)
+
+Sets the HTML template for grid items.
 
 ```javascript
 renderize.gridItemTemplate = `<div class="card"> ... </div>`;
 ```
 
+### `listItemTemplate` (setter)
 
-
-## listItemTemplate(Html)
-
-#### Parameters
-1. Html (String): The HTML template for each list item.
-
-#### Type
-Setter
-
-#### Description
-Sets the template for list items, providing flexibility in defining the appearance.
-
-
-#### Code
+Sets the HTML template for list items.
 
 ```javascript
 renderize.listItemTemplate = `<div class="card"> ... </div>`;
 ```
 
+### `tableRowHtml` (setter)
 
-
-## tableRowHtml(Html)
-
-#### Parameters
-1. Html (String): The HTML template for each table row.
-
-#### Type
-Setter
-
-#### Description
-Sets the HTML template for table rows, allowing customization of the table layout.
-
-#### Code
+Sets the HTML template for table rows.
 
 ```javascript
-renderize.tableRowHtml = `<div class="card"> ... </div>`;
+renderize.tableRowHtml = `<tr> ... </tr>`;
 ```
 
+### `tableColumns` (setter)
 
-## tableColumns(Array)
-
-#### Parameters
-1. Array (Array): Array for Table Headings.
-
-#### Type
-Setter
-
-#### Description
-Sets the Table Headings, allowing customization of the table headings.
-
-#### Code
+Sets the table headings. Must be called after `tableRowHtml` is set.
 
 ```javascript
-renderize.tableColumns = ["S.no","Name"];
+renderize.tableColumns = ["S.no", "Name", "Price"];
 ```
 
+### `view` (setter)
 
-## view(View)
-
-#### Parameters
-1. View (String): The view to set for rendering data (e.g., "grid", "list", "table").
-
-#### Type
-Setter
-
-#### Description
-Changes the view mode for rendering data.
-
-#### Code
+Changes the active view mode. Must not be called when Selection Mode is active. Must not be called when in Search state if searching is active.
 
 ```javascript
-renderize.view = "grid";
+renderize.view = "grid"; // "grid" | "list" | "table"
 ```
 
+### `totalPages` (getter)
 
-## search(Query)
-
-#### Parameters
-1. Query (String): The search query.
-
-
-#### Description
-Searches for data based on the provided query, updating the displayed results in smartway.
-
-
-#### Code
-
-```javascript
-renderize.search("example");
-```
-
-
-## afterSearching(response)
-
-#### Parameters
-1. response (Json): the response which is fetched from API.
-
-#### Description
-This is an event.The afterSearching will trigger after receiving a response from the search API.
-Return is necessary
-
-#### Code
-```javascript
-renderize.afterSearching = (response) => {
-  console.log("Searched.");
-
-  // response = {
-  //   success:true,
-  //   data:[
-  //     { /* ... */ },
-  //   ]
-  // }
-  // if your data is like this then return response.data
-
-  return response;
-};
-```
-
-## startSelection(Callback,Options)
-
-#### Parameters
-1. Callback (Function): A callback function to handle selected items.
-2. Options (Object): Options to set checkbox
-
-
-#### Description
-Initiates the selection mode, allowing users to interactively select items and perform operations like multi delete.
-
-#### Code
-
-```javascript
-renderize.startSelection((currentElement) => {
-  // Handle selected items...
-},{
-    top:"auto", // To set the top position of the checkbox
-    right:"7px", // To set the right position of the checkbox
-    bottom:"7px", // To set the bottom position of the checkbox
-    left:"auto", // To set the left position of the checkbox
-    class:"selectionCheckbox" // To set the class on the checkbox. Default is selection
-});
-```
-
-## stopSelection()
-
-
-#### Description
-Exits the selection mode, concluding the interactive selection process.
-
-
-#### Code
-
-```javascript
-renderize.stopSelection();
-```
-
-
-## beforeAutofetch()
-
-#### Description
-This is an event.The beforeAutofetch will trigger before requesting more data..
-
-#### Code
-
-```javascript
-renderize.beforeAutofetch = () => {
-  loaderContainer.classList.remove("hidden")
-  console.log("Fetching more elements...");
-};
-```
-
-## afterAutofetch(response)
-
-#### Parameters
-1. response (Json): the response which is fetched from API.
-
-#### Description
-This is an event.The afterAutofetch will trigger after fetching more data.
-Return is necessary
-
-#### Code
-
-```javascript
-renderize.afterAutofetch = (response) => {
-  loaderContainer.classList.add("hidden")
-  console.log("More elements are loaded.");
-
-  // response = {
-  //   success:true,
-  //   data:[
-  //     { /* ... */ },
-  //   ]
-  // }
-  // if your data is like this then return response.data
-
-  return response;
-};
-```
-
-
-## Methods for Pagination
-
-## perPage(Value)
-
-#### Parameters
-1. Value (Number): The number of items to display in per page.
-
-#### Type
-Setter
-
-#### Description
-Sets the number of items to display in per page.
-
-
-#### Code
-
-```javascript
-renderize.perPage = 30;
-```
-
-
-## totalPages()
-
-#### Type
-Getter
-
-#### Description
-Gets the total number of pages.
-
-
-#### Code
+Returns the total number of pages. Automatically returns the correct value for whichever state is active — **main** or **search**.
 
 ```javascript
 const total = renderize.totalPages;
 ```
 
+### `currentPage` (getter)
 
-## currentPage()
-
-#### Type
-Getter
-
-#### Description
-Gets the current page number.
-
-#### Code
+Returns the current page number. Automatically returns the correct value for the active state — **main** or **search**.
 
 ```javascript
 const current = renderize.currentPage;
 ```
 
+> **Note:** Both `totalPages` and `currentPage` also apply to AutoLoad, since AutoLoad tracks pages internally for auto-fetch and API pagination purposes.
 
-## nextPage()
+### `errors` (getter)
 
+Returns the array of validation/runtime errors.
 
-#### Description
-Moves to the next page, updating the display accordingly.
+```javascript
+console.error(renderize.errors);
+```
 
+### `startSelection(Callback, Options)`
 
-#### Code
+Initiates selection mode, allowing users to multi-select items.
+
+> **Important:** For Selection Mode to work, the root element of your item template must have `position: relative` set.
+>
+> **Restrictions in Selection Mode:**
+> - `search()` is disabled.
+> - `view` setter is disabled.
+> - For Pagination: `nextPage()`, `previousPage()`, and `jumpToPage()` are disabled.
+
+```javascript
+renderize.startSelection((currentElement) => {
+  // Handle selection events
+}, {
+  top: "auto",
+  right: "7px",
+  bottom: "7px",
+  left: "auto",
+  class: "selectionCheckbox" // Default is "selection"
+});
+```
+
+### `stopSelection()`
+
+Exits selection mode and clears all selections.
+
+```javascript
+renderize.stopSelection();
+```
+
+### `beforeAutofetch` (event)
+
+Fires before a background data fetch begins.
+
+```javascript
+renderize.beforeAutofetch = () => {
+  loaderContainer.classList.remove("hidden");
+  console.log("Fetching more data...");
+};
+```
+
+### `afterAutofetch` (event)
+
+Fires after a background data fetch completes — for **both main data fetching and API searching**. Use the `state` parameter to distinguish between them. A return value is **required** — return the array of items from your response.
+
+```javascript
+renderize.afterAutofetch = (state, response) => {
+  loaderContainer.classList.add("hidden");
+
+  // state = "main" | "search"
+  console.log("Fetch state:", state);
+
+  // response = {
+  //   success: true,
+  //   data: [ { /* ... */ } ]
+  // }
+  // Extract and return the actual data array from the response:
+  return response.data;
+};
+```
+
+> **Note:** `afterSearching` is **deprecated** as of v3.0.0. Use `afterAutofetch` instead, checking the `state` parameter to handle search vs main fetch separately.
+
+---
+
+## Methods for Pagination
+
+### `perPage` (setter)
+
+Sets the number of items per page.
+
+```javascript
+renderize.perPage = 30;
+```
+
+### `nextPage()`
+
+Moves to the next page. Prohibited in Selection Mode.
 
 ```javascript
 renderize.nextPage();
 ```
 
-## previousPage()
+### `previousPage()`
 
-#### Description
-Moves to the previous page, adjusting the displayed content.
-
-
-#### Code
+Moves to the previous page. Prohibited in Selection Mode.
 
 ```javascript
 renderize.previousPage();
 ```
 
+### `jumpToPage(PageNumber)`
 
-
-## jumpToPage(PageNumber)
-
-#### Parameters
-1. PageNumber (Number): The page number to jump to.
-
-
-#### Description
-Jumps to the specified page, facilitating quick navigation.
-
-
-#### Code
+Jumps to a specific page. Prohibited in Selection Mode.
 
 ```javascript
 renderize.jumpToPage(3);
 ```
 
+---
 
 ## Methods for AutoLoad
 
-## beforeAutoload()
+### `beforeAutoload` (event)
 
-#### Description
-This is an event.The beforeAutoload will trigger before more elements are loaded.
-
-#### Code
+Fires before more items are appended via auto-loading.
 
 ```javascript
 renderize.beforeAutoload = () => {
-  loaderContainer.classList.remove("hidden")
-  console.log("Loading more elements...");
+  loaderContainer.classList.remove("hidden");
+  console.log("Loading more items...");
 };
 ```
 
-## afterAutoload()
+### `afterAutoload` (event)
 
-#### Description
-This is an event.The afterAutoload will trigger after more elements are loaded.
-
-#### Code
+Fires after more items have been appended via auto-loading.
 
 ```javascript
 renderize.afterAutoload = () => {
-  loaderContainer.classList.add("hidden")
-  console.log("More elements are loaded.");
+  loaderContainer.classList.add("hidden");
+  console.log("More items loaded.");
 };
 ```
 
-## cleanUp()
+### `cleanUp()`
 
-#### Description
-Manually triggers the cleanup process to remove old elements from the container when the view is switched. Only applicable for AutoLoad.
-
-#### Code
+Manually triggers the cleanup process on the current or specified view, removing rendered elements and resetting the render state. Useful when you want to force a fresh re-render.
 
 ```javascript
 renderize.cleanUp();
 ```
 
+---
+
 ## Templator Class
 
-### Overview
-The Templator class in Renderize enables users to create custom templators, allowing for a highly flexible and customizable rendering process. Templators define functions that influence the parsing and rendering of data rows.
+The `Templator` class allows you to extend Renderize's rendering pipeline with custom parse logic applied globally (once) or per row.
 
-## Constructor
-
-## constructor(TemplatingBasicMethods)
-
-#### Parameters
-1. TemplatingBasicMethods (Object): An object containing basic templating methods for rendering.
-
-#### Description
-The Templator constructor initializes an instance of the custom templator class. It requires an object, TemplatingBasicMethods, which provides fundamental templating methods for use within the templator.
-
-
-#### Code
+### Constructor
 
 ```javascript
-// Custom templator class definition
-class Templator {
-    #templatingBasicMethods;
+class MyTemplator {
+  #templatingBasicMethods;
 
-    // Constructor for the Templator class
-    constructor(TemplatingBasicMethods) {
-        // Initialize TemplatingBasicMethods for use within the class
-        this.#templatingBasicMethods = TemplatingBasicMethods;
-    }
-
-    // ... (other methods)
+  constructor(TemplatingBasicMethods) {
+    this.#templatingBasicMethods = TemplatingBasicMethods;
+  }
 }
-
 ```
 
+### `oneTimeParse(Template)`
 
-
-## Methods
-
-
-## oneTimeParse(Template)
-
-#### Parameters
-1. Template (String): The HTML template.
-
-
-#### Description
-This function is called only once during the initialization of the template. It provides an opportunity to modify or enhance the template globally before the rendering process begins.
-
-
-#### Return
-String: The HTML template.
-
-
-#### Code
+Called once when the template is set. Modify the template globally before rendering begins.
 
 ```javascript
 class MyTemplator {
   oneTimeParse(template) {
-    // Modify the template
-    return template;
+    return template.replace(/\[\[custom\]\]/g, '<span class="custom"></span>');
   }
 }
-
-renderize.register.templator(MyTemplator());
 ```
 
+### `parseOnEveryRow(Template, Data, RowNumber)`
 
-## parseOnEveryRow(Template, Data, RowNumber)
-
-#### Parameters
-1. Template (String): The HTML template for a single row.
-2. Data (Object): The data for the current row.
-3. RowNumber (Number): The number of the current row in the dataset.
-
-
-#### Description
-This function is called for every row in the dataset. It allows dynamic modification of the template based on the specific data and row information.
-
-
-#### Return
-String: The modified HTML template for the current row.
-
-#### Code
+Called for every data row. Modify the template dynamically based on row data.
 
 ```javascript
 class MyTemplator {
   parseOnEveryRow(template, data, rowNumber) {
-    // Modify the template based on data or rowNumber
-    return template;
+    return template.replace('{{rowIndex}}', rowNumber);
   }
 }
-
-renderize.register.templator(MyTemplator());
 ```
 
-## Registering a Templator
-Before setting the item templates (gridItemTemplate, listItemTemplate, tableRowHtml), it is crucial to register the custom templator class. The registration ensures that the oneTimeParse method is called appropriately during the template setup.
+### Registering a Templator
 
-#### Example
+Register before setting item templates.
 
 ```javascript
-// Example of custom templator class
-export class MyTemplator {
-    oneTimeParse(template) {
-        // Modify the template
-        return template;
-    }
-    parseOnEveryRow(template, data, rowNumber) {
-        // Modify the template based on data or rowNumber
-        return template;
-    }
-}
+renderize.register.templator(MyTemplator);
 
-// Register the custom templator before setting the templates
-renderize.register.templator(MyTemplator());
-
-// Set the templates
 renderize.gridItemTemplate = `<div class="card"> ... </div>`;
-renderize.render()
+renderize.render();
 ```
+
+---
 
 ## Arithmetic Templator
 ```javascript
@@ -860,7 +797,7 @@ export class Templator{
 
 ```javascript
 import Renderize from 'renderize';
-import { Templator } from "./Templators/ArithmeticTemplator.js"; // replace with your actual Templator path
+import { Templator } from "./templators/arithmeticTemplator.js"; // replace with your actual Templator path
 
 // Sample data
 let data = [
@@ -870,7 +807,7 @@ let data = [
 
 // Initialize Renderize
 const viewContainer = document.getElementById("viewContainer")
-const renderize = new AutoLoad(data, viewContainer);
+const renderize = new AutoLoad(viewContainer, data);
 
 // Configure Renderize settings
 renderize.config({
@@ -952,4 +889,86 @@ Subtract a percentage value from another column or a static value.
 // with formatNum filter 
 {%column:price|formatNum<subpub:column:discount>%} 
 {%column:price|formatNum<subpub:10>%} 
+```
+
+---
+
+## Full Usage Example (AutoLoad with API)
+
+```javascript
+import AutoLoad from 'renderize/autoload';
+
+const viewContainer = document.getElementById("viewContainer");
+const renderize = new AutoLoad(viewContainer);
+
+renderize.config({
+  view: "grid",
+  perLoad: 20,
+  loadingPerLoad: 10,
+  gridGap: "20px",
+  gridItemMinWidth: "280px",
+  position: "CENTER",
+  loadingClass: "skeleton",
+  autoload: true,
+  autoloadWhen: 5,
+  autoloadMargin: "100px",
+  autoFetch: false,
+  fetchedDataLength: 20,
+  dataApiUrl: "https://api.example.com/products",
+  dataBody: {
+    page: "{nextPage}",
+    limit: 20,
+  },
+  apiSearching: true,
+  searchApiUrl: "https://api.example.com/products/search",
+  searchBody: { limit: 20 },
+  autoCleanupWhen: 100,
+  debug: false,
+});
+
+renderize.gridItemTemplate = `<div class="card" style="position:relative;">
+  <span data-placeholder data-height="200px">
+    {{loadimage|200px|<img src="{%column:thumbnail%}" class="card-img-top" alt="Product">}}
+  </span>
+  <div class="card-body">
+    <h5 class="card-title" data-placeholder data-width="70%">{%column:title|length:30%}...</h5>
+    <p class="price" data-placeholder data-width="60px">$\{%column:price%}</p>
+    <button class="btn btn-primary" data-placeholder>Add to Cart</button>
+  </div>
+</div>`;
+
+// Show skeleton loading before data arrives
+renderize.loading();
+
+// Fetch initial data
+fetch("https://dummyjson.com/products")
+  .then(res => res.json())
+  .then(data => {
+    renderize.updateData(() => data.products);
+    renderize.load();
+  });
+
+// Event hooks
+renderize.beforeAutofetch = () => {
+  renderize.loading();
+};
+
+renderize.afterAutofetch = (state, response) => {
+  // state = "main" or "search"
+  return response.products;
+};
+
+// Search with debounce
+const searchInput = document.getElementById("searchInput");
+let timeout;
+searchInput.addEventListener("keyup", () => {
+  clearTimeout(timeout);
+  timeout = setTimeout(() => {
+    if (searchInput.value) {
+      renderize.search({ q: searchInput.value, limit: 20, page: "{nextPage}" });
+    } else {
+      renderize.resetSearch();
+    }
+  }, 600);
+});
 ```

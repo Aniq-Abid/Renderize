@@ -1,10 +1,11 @@
 class AutoLoad {
-    #data = [{}];
+    #data;
     #renderData;
     #templator = null;
     #mainContainer;
     #viewContainer;
     #view;
+    #debug;
     // grid
     #gridContainer;
     #gridGap;
@@ -32,6 +33,9 @@ class AutoLoad {
     #searchContainerReConfig = true
     //
     #renderState = "main" // search
+    #loading;
+    #loadingClass;
+    #loadingPerLoad
     #firstRenderRow;
     #lastRenderRow;
     #searchFirstRenderRow = 0
@@ -39,8 +43,8 @@ class AutoLoad {
     #currentPage;
     #searchCurrentPage = 1;
     #perLoad
-    #totalPages
-    #searchTotalPages
+    #totalPages = 0
+    #searchTotalPages = 0
     #reRenderGrid = true
     #reRenderList = true
     #reRenderTable = true
@@ -48,22 +52,20 @@ class AutoLoad {
     // 
     #position
     // 
-    #autoFetch
+    #mainAutoFetch = null
     #autoFetchWhen
+    #fetchedDataLength
     // observers
     #imgObserver
     #autoloadObserver
-    #autoload = true;
     #autoloadWhen
     #autoCleanupWhen
     #errors = []
-    constructor(Data, Container) { 
+    constructor(Container, Data = []) {
         this.#mainContainer = Container
         this.#mainContainer.style.overflow = "hidden"
         if (!Array.isArray(Data)) {
-            this.#errors.push("Invalid Data | Data is Not An Array | Data must be Array Object")
-        } else if (Object.prototype.toString.call(Data[0]) !== '[object Object]') {
-            this.#errors.push("Invalid Data | Data is Not An Array Object | Data must be Array Object")
+            this.#errors.push("Invalid Data | Data is Not An Array | Data should be Array Object")
         } else {
             this.#data = Data
             this.dataLength = this.#data.length
@@ -72,8 +74,15 @@ class AutoLoad {
     config(Options = {}) {
         this.#renderData = this.#data
         this.#perLoad = Options.perLoad || 20;
+        this.#loadingPerLoad = Options.loadingPerLoad || this.#perLoad;
         this.#lazyloadImageColor = Options.lazyloadImageColor || "#eee";
+        this.autoload = Options.autoload != undefined ? Options.autoload : true;
         this.#autoloadWhen = Options.autoloadWhen || 10;
+        this.#debug = Options.debug != undefined ? Options.debug : true;
+        this.#view = Options.view || "grid";
+        // loading
+        this.#loading = Options.loading || 'placeholder';
+        this.#loadingClass = Options.loadingClass || 'placeholder'
         // grid
         this.#gridGap = Options.gridGap || "10px";
         this.#gridItemMinWidth = Options.gridItemMinWidth || '200px';
@@ -95,7 +104,7 @@ class AutoLoad {
         // class
         this.#listContainerClass = Options.listContainerClass || 'data-view-list'
         this.#gridContainerClass = Options.gridContainerClass || 'data-view-grid'
-        this.#tableClass = Options.tableClass || 'data-view-table' 
+        this.#tableClass = Options.tableClass || 'data-view-table'
         // positions 
         const POSITIONS = {
             LEFT: "justify-content: flex-start;",
@@ -108,7 +117,6 @@ class AutoLoad {
         this.#position = POSITIONS[Options.position] || POSITIONS['LEFT'];
         // 
         this.#totalPages = this.#calculateTotalPages();
-        this.columns = Object.keys(this.#data[0]);
         this.selected = [];
         this.inSelection = false;
         // currentPage
@@ -133,26 +141,31 @@ class AutoLoad {
         this.#templator = new Templator({
             "lazyloadImageColor": this.#lazyloadImageColor
         });
+        this.#configContainer();
         // Image Observer for lazy load images
         this.#imgObserver = new IntersectionObserver((images) => {
             const length = images.length;
             for (let index = 0; index < length; index++) {
                 if (images[index].isIntersecting) {
                     const img = images[index].target;
-                    img.src = img.dataset.viewLoadimg
+                    img.src = img.dataset.renderizeLoadimg
                     img.style.visibility = "visible"
                     // Remove the observer after loading the image
                     this.#imgObserver.unobserve(img);
                 }
             }
         }, { rootMargin: "120px" });
+
         // AutoLoad Observer
-        if (this.#autoload) {
+        this.autoloaded = true;
+        if (this.autoload) {
             this.#autoloadObserver = new IntersectionObserver((entries) => {
                 const entry = entries[0];
+
                 if (entry.isIntersecting) {
                     if (this.#renderState == "main") {
-                        if (this.#currentPage[this.#view] < this.#totalPages) {
+
+                        if (this.#currentPage[this.#view] <= this.#totalPages) {
                             if (this.beforeAutoload) {
                                 this.beforeAutoload()
                             }
@@ -165,11 +178,12 @@ class AutoLoad {
                             this.autoloaded = false;
                         }
                     } else if (this.#renderState == "search") {
-                        if (this.#searchCurrentPage < this.#searchTotalPages) {
+                        if (this.#searchCurrentPage <= this.#searchTotalPages) {
                             if (this.beforeAutoload) {
                                 this.beforeAutoload()
                             }
                             this.#rendering(false);
+                            this.#autoloadObserver.unobserve(entry.target)
                             this.autoloaded = true;
                             this.#searchCurrentPage++;
                         } else {
@@ -179,29 +193,44 @@ class AutoLoad {
                 }
             }, { rootMargin: Options.autoloadMargin || "0px" });
         }
+
         // time out | set these configuration after few seconds
         setTimeout(() => {
             // Search
             this.#searchContainer.style.display = "grid";
             this.#searchContainer.style.position = "relative";
             this.apiSearching = Options.apiSearching || false;
-            this.searchApi = Options.searchApi || ""
-            this.searchApiOptions = Options.searchApiOptions || {}
-            if (this.apiSearching) {
-                if (this.searchApi == "") { this.#errors.push("Search API Url not provided for fetching data."); }
-                else if (typeof this.searchApi != 'string') { this.#errors.push("Invalid Search API Url"); }
-                else if (!this.searchApi.startsWith("http") && !this.searchApi.startsWith("https")) { this.#errors.push("Invalid Search API Url .Protocol not Provided"); }
+            this.searchApiUrl = Options.searchApiUrl || "",
+                this.searchApiOptions = Options.searchApiOptions || {}
+            this.searchBody = Options.searchBody || {}
+            if (this.apiSearching && this.#debug) {
+                if (this.searchApiUrl == "") { this.#errors.push("Search API Url not provided for fetching data."); }
+                else if (typeof this.searchApiUrl != 'string') { this.#errors.push("Invalid Search API Url"); }
+                else if (!this.searchApiUrl.startsWith("http") && !this.searchApiUrl.startsWith("https")) { this.#errors.push("Invalid Search API Url. HTTP Protocol not Provided"); }
             }
             // autoFetch
-            this.#autoFetch = Options.autoFetch || false;
             this.#autoFetchWhen = Options.autoFetchWhen || 40;
+            if (Options.fetchedDataLength) {
+                if (this.dataLength >= Options.fetchedDataLength) {
+                    this.autoFetch = true;
+                } else {
+                    this.autoFetch = false
+                }
+
+                this.#fetchedDataLength = Options.fetchedDataLength;
+            } else {
+                this.#fetchedDataLength = false;
+                this.autoFetch = Options.autoFetch || false;
+            }
             this.dataApiUrl = Options.dataApiUrl || "";
             this.dataApiOptions = Options.dataApiOptions || {};
-            if (this.#autoFetch) {
+            this.dataBody = Options.dataBody || {};
+            if (this.autoFetch && this.#debug) {
                 if (this.dataApiUrl == "") { this.#errors.push("Data API Url not provided for fetching data."); }
                 else if (typeof this.dataApiUrl != 'string') { this.#errors.push("Invalid Data API Url"); }
-                else if (!this.dataApiUrl.startsWith("http") && !this.dataApiUrl.startsWith("https")) { this.#errors.push("Invalid Data API Url .Protocol not Provided"); }
+                else if (!this.dataApiUrl.startsWith("http") && !this.dataApiUrl.startsWith("https")) { this.#errors.push("Invalid Data API Url.HTTP Protocol not Provided"); }
             }
+
             // autoCleanupWhen
             this.#autoCleanupWhen = Options.autoCleanupWhen || 100
             // 
@@ -214,6 +243,28 @@ class AutoLoad {
             });
         }, 500);
     }
+
+    get totalPages() {
+        let totalPages;
+
+        if (this.#renderState == "main") {
+            totalPages = this.#totalPages;
+        } else if (this.#renderState == "search") {
+            totalPages = this.#searchTotalPages;
+        }
+        return totalPages;
+    }
+    get currentPage() {
+        let current;
+        if (this.#renderState == "main") {
+            current = this.#currentPage;
+
+        } else if (this.#renderState == "search") {
+            current = this.#searchCurrentPage;
+        }
+
+        return current
+    }
     get errors() {
         return this.#errors;
     }
@@ -225,7 +276,7 @@ class AutoLoad {
             }
         }
     }
-    get viewContainer(){
+    get viewContainer() {
         return this.#viewContainer
     }
     /**
@@ -234,7 +285,7 @@ class AutoLoad {
     set listItemTemplate(Html) {
         if (this.#errors.length > 0) { return }
         Html = Html.trim()
-        if (!Html.startsWith("<")) { this.#errors.push("Invalid List Item Template"); return "" }
+        if (this.#debug && !Html.startsWith("<")) { this.#errors.push("Invalid List Item Template"); return "" }
         // Find the position of the opening bracket and the first space to extract the tag
         const openBracketIndex = Html.indexOf('<');
         const firstSpaceIndex = Html.indexOf(' ', openBracketIndex);
@@ -243,14 +294,12 @@ class AutoLoad {
         // Extract the tag name
         let tagname = Html.slice(openBracketIndex + 1, endTagIndex).toLowerCase();
         tagname = tagname.lastIndexOf('>') != -1 ? tagname.slice(0, -2) : tagname
-        if (!Html.endsWith(`</${tagname}>`)) { this.#errors.push("Invalid List Item Template"); return "" }
+        if (this.#debug && !Html.endsWith(`</${tagname}>`)) { this.#errors.push("Invalid List Item Template"); return "" }
         this.#listItemTagName = tagname;
         this.#listItemHtml = this.#templator.oneTimeParse(Html);
         // 
-        this.#listContainer = document.createElement('div');
         this.#listContainer.id = 'ViewListContainer';
         this.#listContainer.className = this.#listContainerClass;
-        this.#listContainer.style.display = "none";
         this.#listContainer.style.gap = this.#listGap;
         this.#listContainer.style.position = "relative";
         this.#mainContainer.append(this.#listContainer);
@@ -262,7 +311,7 @@ class AutoLoad {
     set gridItemTemplate(Html) {
         if (this.#errors.length > 0) { return }
         Html = Html.trim()
-        if (!Html.startsWith("<") || Html.startsWith("< ")) { this.#errors.push("Invalid Grid Item Template"); return "" }
+        if (this.#debug && !Html.startsWith("<") || Html.startsWith("< ")) { this.#errors.push("Invalid Grid Item Template"); return "" }
         // Find the position of the opening bracket and the first space to extract the tag
         const openBracketIndex = Html.indexOf('<');
         const firstSpaceIndex = Html.indexOf(' ', openBracketIndex);
@@ -271,14 +320,12 @@ class AutoLoad {
         // Extract the tag name
         let tagname = Html.slice(openBracketIndex + 1, endTagIndex).toLowerCase();
         tagname = tagname.lastIndexOf('>') != -1 ? tagname.slice(0, -2) : tagname
-        if (!Html.endsWith(`</${tagname}>`)) { this.#errors.push("Invalid Grid Item Template"); return "" }
+        if (this.#debug && !Html.endsWith(`</${tagname}>`)) { this.#errors.push("Invalid Grid Item Template"); return "" }
         this.#gridItemTagName = tagname;
         this.#gridItemHtml = this.#templator.oneTimeParse(Html);
         // 
-        this.#gridContainer = document.createElement('div');
         this.#gridContainer.id = 'ViewGridContainer';
         this.#gridContainer.className = this.#gridContainerClass;
-        this.#gridContainer.style.display = 'none';
         this.#gridContainer.style.gap = this.#gridGap;
         this.#gridContainer.style.position = "relative";
         this.#mainContainer.append(this.#gridContainer);
@@ -289,23 +336,21 @@ class AutoLoad {
      */
     set tableRowHtml(Html) {
         if (this.#errors.length > 0) { return }
-        Html = Html.trim()
-        if (!Html.startsWith("<")) { this.#errors.push("Invalid Table Row Template"); return "" }
+        Html = Html.trim();
+        if (this.#debug && !Html.startsWith("<")) { this.#errors.push("Invalid Table Row Template"); return "" }
         this.#tableRowHtml = this.#templator.oneTimeParse(Html);
         // 
-        this.#tableContainer = document.createElement('table');
         this.#tableContainer.id = 'ViewTableContainer';
         this.#tableContainer.style.position = "relative";
         this.#tableContainer.className = this.#tableClass;
         this.#tableContainer.createTBody();
-        this.#tableContainer.style.display = 'none';
         this.#mainContainer.append(this.#tableContainer);
     }
     /**
      * @param {array} Array
      */
     set tableColumns(Array) {
-        if (this.#tableRowHtml == null) { this.#errors.push("Please Set Table Row Template First."); return null; }
+        if (this.#debug && this.#tableRowHtml == null) { this.#errors.push("Please Set Table Row Template First."); return null; }
         this.#tableColumns = Array
         let tHead = this.#tableContainer.createTHead();
         let tableHeadings = "<tr>";
@@ -329,14 +374,12 @@ class AutoLoad {
                 this.#viewContainer = this.#tableContainer;
                 this.#viewContainer.style.display = "table";
             } else {
-                this.#tableContainer ? this.#tableContainer.style.display = "none":'';
+                this.#tableContainer ? this.#tableContainer.style.display = "none" : '';
                 this.#searchContainerConfig(this.#view);
                 this.#viewContainer = this.#searchContainer;
                 this.#viewContainer.style.display = "grid";
             }
-            this.#searchFirstRenderRow = 0;
-            this.#searchLastRenderRow = 0;
-            this.#searchCurrentPage = 1;
+            this.#searchLastRenderRow -= this.#perLoad - 1;
             this.#rendering();
             return;
         }
@@ -413,82 +456,14 @@ class AutoLoad {
             this.#reRenderTable = true;
         }
     }
-    async search(Query) {
+    async search(Body = {}) {
+
         if (this.inSelection) { return "You are in Selection Mode"; }
-        if (Query == "") {
-            let rerender;
-            if (this.#view == "grid") { this.#viewContainer = this.#gridContainer; this.#gridContainer.style.display = "grid";rerender =  this.#reRenderGrid}
-            else if (this.#view == "list") { this.#viewContainer = this.#listContainer; this.#listContainer.style.display = "grid";rerender =  this.#reRenderList }
-            else if (this.#view == "table") { this.#viewContainer = this.#tableContainer; this.#tableContainer.style.display = "table";rerender =  this.#reRenderTable }
-            this.#searchContainer.style.display = "none";
-            this.#renderData = this.#data;
-            this.#searchCurrentPage = 1;
-            this.#renderState = "main";
-            if (rerender) {
-                this.#rendering();
-            }
-            this.#searchContainer.innerHTML = "";
-            this.searchQuery = null;
-            return;
-        }
+        if (!this.searchApiUrl || this.searchApiUrl == "") { return "No Search Api Url Found"; }
 
         if (this.#searchContainerReConfig) {
             this.#searchContainerReConfig = false;
             this.#searchContainerConfig();
-        }
-        if (this.apiSearching) {
-            const url = this.searchApi.replace(/{(.*?)}/g, (match, placeholder) => {
-                if (placeholder == "query") {
-                    return Query;
-                } else if (placeholder == "searchCaseSensitive") {
-                    return this.searchCaseSensitive;
-                } else if (placeholder == "column") {
-                    return this.searchIn;
-                }
-                // 
-                if (placeholder == "last") {
-                    return this.dataLength - 1
-                } else if (placeholder == "last:index") {
-                    return this.dataLength - 1
-                } else if (placeholder == "last:counter") {
-                    return this.dataLength
-                } else if (placeholder.startsWith("last:")) {
-                    return this.#data[this.dataLength - 1][placeholder.slice(5)]?.toString().replace(/ /g, "%20");
-                }
-                else if (placeholder == "perLoad") {
-                    return this.#perLoad
-                }
-            });
-            let data = await fetch(url, this.searchApiOptions);
-            try {
-                data = await data.json();
-                if (this.afterSearching) {
-                    this.#renderData = this.afterSearching(data)
-                } else {
-                    this.#renderData = data;
-                }
-            } catch (error) {
-                if (this.afterSearching) {
-                    this.errors.push(error)
-                    this.afterSearching(error)
-                }
-            }
-        } else {
-            this.#renderData = this.#data.filter((Value) => {
-                if (this.searchIn == "all") {
-                    if (this.searchCaseSensitive) {
-                        return JSON.stringify(Value).includes(Query);
-                    } else {
-                        return JSON.stringify(Value).toLowerCase().includes(Query.toLowerCase());
-                    }
-                } else {
-                    if (this.searchCaseSensitive) {
-                        return String(Value[this.searchIn]).includes(Query);
-                    } else {
-                        return String(Value[this.searchIn]).toLowerCase().includes(Query.toLowerCase());
-                    }
-                }
-            });
         }
         if (this.#viewContainer != this.#searchContainer) {
             if (this.#view == "grid") { this.#gridContainer.style.display = "none" }
@@ -502,139 +477,104 @@ class AutoLoad {
                 this.#viewContainer.style.display = "grid";
             }
         }
+
+        this.#renderState = "search";
         this.#searchFirstRenderRow = 0;
         this.#searchLastRenderRow = 0;
         this.#searchCurrentPage = 1;
-        this.#renderState = "search";
-        this.#rendering();
-        this.searchQuery = Query;
-        this.#searchTotalPages = this.#calculateTotalPages();
-    }
-    render(View = "grid") {
-        this.#view = View;
-        switch (View) {
-            case "grid":
-                if (this.#gridItemHtml == null) { this.#errors.push("Please Set Grid Item Template First."); return null; }
-                this.#gridContainer.style.display = 'grid';
-                this.#viewContainer = this.#gridContainer;
-                break;
-            case "list":
-                if (this.#listItemHtml == null) { this.#errors.push("Please Set List Item Template First."); return null; }
-                this.#listContainer.style.display = 'grid';
-                this.#viewContainer = this.#listContainer;
-                break;
-            case "table":
-                if (this.#tableRowHtml == null) { this.#errors.push("Please Set Table Row Template First."); return null; }
-                if (this.#tableContainer.tHead == null) { this.#errors.push("Please Set Table Headings First With tableColumns Which Is Setter Method."); }
+        this.#searchTotalPages = 0;
 
-                this.#tableContainer.style.display = "table"
-                this.#viewContainer = this.#tableContainer;
-                this.#searchContainerReConfig = false;
-                break;
+        if (this.#mainAutoFetch == null) {
+            this.#mainAutoFetch = this.autoFetch;
         }
-        this.#rendering();
-    }
-    async #fetchData() {
-        let lastRenderRow;
-        let dataLength;
-        let apiUrl;
-        if (this.#renderState == "main") {
-            lastRenderRow = this.#lastRenderRow[this.#view];
-            dataLength = this.dataLength;
-            apiUrl = this.dataApiUrl;
-        } else {
-            lastRenderRow = this.#searchLastRenderRow;
-            dataLength = this.#renderData.length;
-            apiUrl = this.searchApi.replace(/{(.*?)}/g, (match, placeholder) => {
-                if (placeholder == "query") {
-                    return this.searchQuery;
-                } else if (placeholder == "searchCaseSensitive") {
-                    return this.searchCaseSensitive;
-                } else if (placeholder == "column") {
-                    return this.searchIn;
-                }
-            });
+
+        if (this.#loading == "placeholder") {
+            this.#viewContainer.innerHTML = ''
+            this.loading()
         }
-        if ((dataLength - (lastRenderRow + 1) <= this.#autoFetchWhen) && dataLength >= this.#perLoad) {
-            if (this.beforeAutofetch) {
-                this.beforeAutofetch();
-            }
-            const url = apiUrl.replace(/{(.*?)}/g, (match, placeholder) => {
-                if (placeholder == "last") {
-                    return this.dataLength - 1
-                } else if (placeholder == "last:index") {
-                    return this.dataLength - 1
-                } else if (placeholder == "last:counter") {
-                    return this.dataLength
-                } else if (placeholder.startsWith("last:")) {
-                    return this.#data[this.dataLength - 1][placeholder.slice(5)]?.toString().replace(/ /g, "%20");
-                }
-                else if (placeholder == "perLoad") {
-                    return this.#perLoad
-                }
-            });
-            let data = await fetch(url, this.dataApiOptions);
+        if (this.apiSearching) {
+            const { apiUrl, apiOptions } = this.#prepareRequest(this.searchApiUrl, this.searchApiOptions, Body);
+
             try {
+                let data;
+                if (apiOptions) {
+                    data = await fetch(apiUrl, apiOptions);
+                } else {
+                    data = await fetch(apiUrl);
+                }
                 data = await data.json();
                 let newData;
                 if (this.afterAutofetch) {
-                    newData = this.afterAutofetch(data)
+                    newData = this.afterAutofetch(this.#renderState, data)
 
                 } else {
                     newData = data
                 }
-                if (this.#renderState == "main") {
-                    this.#data = this.#data.concat(newData);
-                    this.#renderData = this.#data;
-                } else {
-                    this.#renderData = this.#renderData.concat(newData);
-                }
-                if (!this.autoloaded) {
-                    this.#rendering(false);
-                    this.autoloaded = true;
-                    if (this.#renderState == "main") {
-                        this.#currentPage[this.#view]++;
+                this.#renderData = newData;
+
+
+                if (this.#fetchedDataLength) {
+
+                    if (newData.length >= this.#fetchedDataLength) {
+
+                        this.autoFetch = true;
                     } else {
-                        this.#searchCurrentPage++;
+                        this.autoFetch = false
                     }
                 }
-                if (this.#renderState == 'main') {
-                    this.#totalPages = this.#calculateTotalPages();
-                    this.dataLength += newData.length
 
-                } else {
-                    this.#searchTotalPages = this.#calculateTotalPages();
-                }
             } catch (error) {
+                this.errors.push(error)
                 if (this.afterAutofetch) {
                     this.afterAutofetch(error)
                 }
-                this.errors.push(error)
             }
+        } else if (Body.query) {
+            const query = Body.query;
+            this.#renderData = this.#data.filter((Value) => {
+                if (this.searchIn == "all") {
+                    if (this.searchCaseSensitive) {
+                        return JSON.stringify(Value).includes(query);
+                    } else {
+                        return JSON.stringify(Value).toLowerCase().includes(query.toLowerCase());
+                    }
+                } else {
+                    if (this.searchCaseSensitive) {
+                        return String(Value[this.searchIn]).includes(query);
+                    } else {
+                        return String(Value[this.searchIn]).toLowerCase().includes(query.toLowerCase());
+                    }
+                }
+            });
         }
+
+        this.#rendering();
+        this.searchBody = Body;
+        this.#searchTotalPages = this.#calculateTotalPages();
     }
 
-    #rendering(newInsert = true) {
-        if (this.errors.length > 0) { return; }
-        let itemHtml;
-        let firstRow;
-        let lastRow;
-        if (this.#renderState == "main") {
-            if (newInsert) {
-                firstRow = this.#firstRenderRow[this.#view];
-            } else {
-                firstRow = ++this.#lastRenderRow[this.#view];
-            }
-            lastRow = this.#lastRenderRow[this.#view];
-        } else if (this.#renderState == "search") {
-
-            if (newInsert) {
-                firstRow = this.#searchFirstRenderRow;
-            } else {
-                firstRow = ++this.#searchLastRenderRow;
-            }
-            lastRow = this.#searchLastRenderRow;
+    resetSearch() {
+        let rerender;
+        if (this.#view == "grid") { this.#viewContainer = this.#gridContainer; this.#gridContainer.style.display = "grid"; rerender = this.#reRenderGrid }
+        else if (this.#view == "list") { this.#viewContainer = this.#listContainer; this.#listContainer.style.display = "grid"; rerender = this.#reRenderList }
+        else if (this.#view == "table") { this.#viewContainer = this.#tableContainer; this.#tableContainer.style.display = "table"; rerender = this.#reRenderTable }
+        this.#searchContainer.style.display = "none";
+        this.#renderData = this.#data;
+        this.#searchCurrentPage = 1;
+        this.#renderState = "main";
+        if (this.#mainAutoFetch != null) {
+            this.autoFetch = this.#mainAutoFetch;
+            this.#mainAutoFetch = null;
         }
+        if (rerender) {
+            this.#rendering();
+        }
+        this.#searchContainer.innerHTML = "";
+        return;
+    }
+
+    async loading() {
+        let itemHtml = '';
         if (this.#view == "grid") {
             if (this.#gridItemHtml == null) { this.#errors.push("Please Set Grid Item Template First."); return null; }
             itemHtml = this.#gridItemHtml;
@@ -645,112 +585,92 @@ class AutoLoad {
             if (this.#tableRowHtml == null) { this.#errors.push("Please Set Table Row Template First."); return null; }
             itemHtml = this.#tableRowHtml;
         }
-        let numberOfRows = this.#perLoad + lastRow;
-        let index;
+
+        // parse your template string once into a DOM element
+        const tempContainer = document.createElement('tbody');
+        tempContainer.innerHTML = itemHtml.trim();
+        const itemNode = tempContainer.firstElementChild;
+        if (!itemNode) return;
+        // set class to item node for remove on rendering
+        itemNode.classList.add('placeholder-item');
         const fragment = document.createDocumentFragment();
-        const element = document.createElement("tbody");
-        for (index = firstRow; index < numberOfRows; index++) {
-            if (this.#renderData[index] == undefined) { break; }
-            element.insertAdjacentHTML("beforeend", this.#templator.parseOnEveryRow(itemHtml, this.#renderData[index], index));
-            fragment.appendChild(element.firstChild);
-        }
-        if (this.#renderState == "search") {
-            this.#searchLastRenderRow = --index;
-        } else {
-            this.#lastRenderRow[this.#view] = --index;
+        const loadingClass = this.#loadingClass;
+        const numberOfRows = this.#loadingPerLoad
+        for (let i = 0; i < numberOfRows; i++) {
+            // deep‑clone the node so we don't overwrite the original
+            const clone = itemNode.cloneNode(true);
+
+            // find all elements marked for placeholder
+            clone.querySelectorAll('[data-placeholder]').forEach(el => {
+                // clear any text or children
+                el.textContent = '...';
+
+                // remove src attribute from image tag
+                if (el.tagName == "IMG") {
+                    el.removeAttribute('alt');
+                    el.removeAttribute('src');
+                }
+                // apply the placeholder class
+                el.className += ` ${loadingClass}`;
+                const dataset = el.dataset;
+                for (const attr of Object.keys(dataset)) {
+                    if (attr != "placeholder") {
+                        el.style[attr] = dataset[attr];
+                    }
+                }
+            });
+            // for dark
+            clone.querySelectorAll('[data-placeholder-dark]').forEach(el => {
+                // clear any text or children
+                el.textContent = '...';
+                // apply the placeholder class
+                el.className += ` ${loadingClass}-dark ${loadingClass}`;
+                const dataset = el.dataset;
+                for (const attr of Object.keys(dataset)) {
+                    if (attr != "placeholder") {
+                        el.style[attr] = dataset[attr];
+                    }
+                }
+            });
+            // remove element 
+            clone.querySelectorAll('[data-placeholder-remove]').forEach(el => {
+                el.remove();
+            })
+
+            const wrapper = document.createElement('div');
+
+            wrapper.appendChild(clone);
+            fragment.appendChild(clone);
         }
 
         let container = this.#viewContainer
         if (this.#view == "table") {
             container = container.tBodies[0]
         }
-        if (newInsert) {
-            container.innerHTML = "";
-            container.appendChild(fragment);
-        } else {
-            container.appendChild(fragment);
+        container.appendChild(fragment);
+    }
+
+    render() {
+        this.#rendering();
+    }
+    load() {
+        this.#rendering(false);
+    }
+
+    removeLoading() {
+        let container = this.#viewContainer
+        if (this.#view == "table") {
+            container = container.tBodies[0]
         }
-        if (this.afterAutoload) {
-            this.afterAutoload();
-        }
-        setTimeout(() => {
-            if (this.#renderState == 'main') {
-                if (this.#view == "grid") {
-                    this.#reRenderGrid = false;
-                } else if (this.#view == "list") {
-                    this.#reRenderList = false;
-                } else if (this.#view == "table") {
-                    this.#reRenderTable = false;
-                }
-            } else {
-                if (this.#view == "table") {
-                    this.#reRenderTable = true;
-                }
-            }
-            // 
-            const images = document.querySelectorAll(`#${this.#viewContainer.id} img[data-view-loadimg]`);
-            const length = images.length;
-            for (let index = 0; index < length; index++) {
-                this.#imgObserver.observe(images[index]);
-            }
-            if (this.#view == "table") {
-                const childArr = Array.from(this.#viewContainer.rows)
-                if (childArr.at(-this.#autoloadWhen)) {
-                    this.#autoloadObserver.observe(childArr.at(-this.#autoloadWhen));
-                } else {
-                    this.#autoloadObserver.observe(childArr.at(-1));
-                }
-            } else {
-                const childArr = Array.from(this.#viewContainer.children)
-                if (childArr.at(-this.#autoloadWhen)) {
-                    this.#autoloadObserver.observe(childArr.at(-this.#autoloadWhen));
-                } else if (childArr.at(-1)){
-                    this.#autoloadObserver.observe(childArr.at(-1));
-                }
-            }
-        }, 70);
-        if (this.#autoFetch) {
-            setTimeout(() => {
-                this.#fetchData()
-            }, 110);
-        }
-        if (this.inSelection) {
-            setTimeout(() => {
-                this.#setupSelection(firstRow, this.#lastRenderRow[this.#view]);
-            }, 80);
+
+        if (this.#loading == "placeholder") {
+            // remove the element which have placeholder-item class
+            container.querySelectorAll(".placeholder-item").forEach((element) => {
+                element.remove();
+            });
         }
     }
-    #setupSelection(start, end) {
-        const options = this.selectionOptions;
-        if (this.#viewContainer == this.#tableContainer) {
-            const rows = this.#viewContainer.rows;
-            if (start == 0) {
-                var td = rows[0].insertCell(0);
-                td.innerHTML = `<input type="checkbox" class="${options.class}" selection="all">`;
-            }
-            for (let index = start; index <= end; index++) {
-                if (rows[index + 1] == undefined) { break; }
-                var td = rows[index + 1].insertCell(0);
-                td.innerHTML = `<input type="checkbox" class="${options.class}" selection="${index}">`;
-            }
-        } else {
-            const children = this.#viewContainer.children;
-            if (children[start] == undefined) {
-                const inputs = this.#viewContainer.querySelectorAll("input[selection]");
-                const startIndex = inputs.length
-                const last = inputs.length + this.#perLoad
-                for (let index = startIndex; index <= last; index++) {
-                    if (children[index] == undefined) { break; }
-                    children[index].insertAdjacentHTML("afterbegin", `<input type="checkbox" class="${options.class}" selection="${index}" style="position: absolute;top: ${options.top};right:${options.right};bottom:${options.bottom};left: ${options.left};z-index: 5;">`)
-                }
-            } else {
-                for (let index = start; index <= end; index++) {
-                    if (children[index] == undefined) { break; }
-                    children[index].insertAdjacentHTML("afterbegin", `<input type="checkbox" class="${options.class}" selection="${index}" style="position: absolute;top: ${options.top};right:${options.right};bottom:${options.bottom};left: ${options.left};z-index: 5;">`)
-                }
-            }
-        }
-    }
+
     startSelection(Callback = false, Options = {}) {
         Options.top = Options?.top || "10px";
         Options.right = Options?.right || "auto";
@@ -766,25 +686,33 @@ class AutoLoad {
             this.#setupSelection(0, this.#viewContainer.children.length - 1);
         }
         // add Event Listener 
+
         this.#mainContainer.onclick = (e) => {
             if (!e.target.getAttribute("selection")) {
-                e.preventDefault();  
+                e.preventDefault();
             }
-            
-            let element; 
+
+            let element;
             if (this.#viewContainer == this.#gridContainer) {
                 element = e.target.closest(`#ViewGridContainer > ${this.#gridItemTagName}`);
 
             } else if (this.#viewContainer == this.#listContainer) {
                 element = e.target.closest(`#ViewListContainer > ${this.#listItemTagName}`);
+            } else if (this.#viewContainer == this.#searchContainer) {
+                if (this.#view == 'grid') {
+                    element = e.target.closest(`#ViewSearchContainer > ${this.#gridItemTagName}`);
+                } else {
+                    element = e.target.closest(`#ViewSearchContainer > ${this.#listItemTagName}`);
+                }
             } else {
                 element = e.target.closest("tbody tr");
             }
+
             if (element) {
                 const input = element.querySelector("input[selection]");
                 if (!input) { return; }
                 if (e.target != input) { input.checked = !input.checked; }
-                
+
                 const index = Number(input.getAttribute("selection"));
                 if (input.checked) {
                     this.selected.push({
@@ -836,6 +764,7 @@ class AutoLoad {
             }
         }
     }
+
     stopSelection() {
         this.selected = [];
         this.inSelection = false;
@@ -854,7 +783,359 @@ class AutoLoad {
     }
     updateData(Callback) {
         this.#data = Callback(this.#data);
+        this.dataLength = this.#data.length
+
+        this.#renderData = this.#data;
+
+
+        if (this.#data.length >= this.#fetchedDataLength) {
+            this.autoFetch = true;
+        } else {
+            this.autoFetch = false
+        }
+
+        this.#totalPages = this.#calculateTotalPages();
+
+
     }
+
+    #setupSelection(start, numberOfRows) {
+        const options = this.selectionOptions;
+        if (this.#viewContainer == this.#tableContainer) {
+            const rows = this.#viewContainer.rows;
+            if (start == 0) {
+                var td = rows[0].insertCell(0);
+                td.innerHTML = `<input type="checkbox" class="${options.class}" selection="all">`;
+            }
+            for (let index = start; index <= numberOfRows; index++) {
+                if (rows[index + 1] == undefined) { break; }
+                var td = rows[index + 1].insertCell(0);
+                td.innerHTML = `<input type="checkbox" class="${options.class}" selection="${index}">`;
+            }
+        } else {
+
+            const children = this.#viewContainer.children;
+
+            if (children[start] == undefined) {
+                const inputs = this.#viewContainer.querySelectorAll("input[selection]");
+                const startIndex = inputs.length
+                const last = inputs.length + this.#perLoad
+                for (let index = startIndex; index <= last; index++) {
+                    if (children[index] == undefined) { break; }
+                    children[index].insertAdjacentHTML("afterbegin", `<input type="checkbox" class="${options.class}" selection="${index}" style="position: absolute;top: ${options.top};right:${options.right};bottom:${options.bottom};left: ${options.left};z-index: 5;">`)
+                }
+            } else {
+                for (let index = start; index <= numberOfRows; index++) {
+                    if (children[index] == undefined) { break; }
+                    children[index].insertAdjacentHTML("afterbegin", `<input type="checkbox" class="${options.class}" selection="${index}" style="position: absolute;top: ${options.top};right:${options.right};bottom:${options.bottom};left: ${options.left};z-index: 5;">`)
+                }
+            }
+        }
+    }
+
+    #prepareRequest(ApiUrl, ApiOptions, Body, DataLength = 0) {
+        let apiUrl = ApiUrl;
+        const body = { ...Body };
+        const apiOptions = { ...ApiOptions };
+
+        for (let [key, value] of Object.entries(body)) {
+
+            if (value == "{last}") {
+                value = DataLength == 0 ? DataLength : DataLength - 1
+            } else if (value == "{last:index}") {
+                value = DataLength == 0 ? DataLength : DataLength - 1
+            } else if (value == "{last:counter}") {
+                value = DataLength
+            } else if (typeof value == "string" && value.startsWith("{last:")) {
+
+                if (DataLength == 0) {
+                    value = 0
+                } else {
+                    const column = value.slice(6, value.length - 1)
+                    value = this.#renderData[DataLength - 1][column]?.toString().replace(/ /g, "%20");
+                }
+            } else if (value == "{perLoad}") {
+                value = this.#perLoad
+            } else if (value == "{nextPage}") {
+                value = this.totalPages + 1
+            } else if (value == "{searchCaseSensitive}") {
+                value = this.searchCaseSensitive;
+            } else if (value == "{searchIn}") {
+                value = this.searchIn;
+            }
+
+            body[key] = value
+        }
+
+        const method = apiOptions?.method?.toUpperCase() || "GET";
+        if (method == "GET") {
+            // set query params 
+            const url = new URL(apiUrl);
+            const searchParams = new URLSearchParams(url.search);
+            for (const [key, value] of Object.entries(body)) {
+                searchParams.set(key, value);
+            }
+            url.search = searchParams
+            apiUrl = url.toString();
+        } else {
+            apiOptions.body = JSON.stringify(body);
+        }
+
+        return { apiUrl, apiOptions }
+    }
+
+    #configContainer() {
+        // create containers 
+        this.#gridContainer = document.createElement('div');
+        this.#listContainer = document.createElement('div');
+        this.#tableContainer = document.createElement('table');
+        // hide containers
+        this.#gridContainer.style.display = 'none';
+        this.#listContainer.style.display = 'none';
+        this.#tableContainer.style.display = 'none';
+
+        switch (this.#view) {
+            case "grid":
+                this.#gridContainer.style.display = 'grid';
+                this.#viewContainer = this.#gridContainer;
+
+                break;
+            case "list":
+                this.#listContainer.style.display = 'grid';
+                this.#viewContainer = this.#listContainer;
+                break;
+            case "table":
+                this.#tableContainer.style.display = "table"
+                this.#viewContainer = this.#tableContainer;
+                this.#searchContainerReConfig = false;
+                break;
+        }
+    }
+    async #fetchData() {
+        let lastRenderRow;
+        let dataLength;
+        let url;
+        let options;
+        let body;
+
+        if (this.#renderState == "main") {
+            lastRenderRow = this.#lastRenderRow[this.#view];
+            dataLength = this.dataLength;
+            url = this.dataApiUrl;
+            options = this.dataApiOptions;
+            body = this.dataBody
+
+        } else if (this.apiSearching) {
+
+            lastRenderRow = this.#searchLastRenderRow;
+            dataLength = this.#renderData.length;
+            options = this.searchApiOptions;
+            url = this.searchApiUrl;
+            body = this.searchBody
+
+        } else {
+            return;
+        }
+
+        if ((dataLength - (lastRenderRow + 1) <= this.#autoFetchWhen) && dataLength >= this.#perLoad) {
+            if (this.beforeAutofetch) {
+                this.beforeAutofetch();
+            }
+            const { apiUrl, apiOptions } = this.#prepareRequest(url, options, body);
+
+            try {
+                let data;
+                if (apiOptions) {
+                    data = await fetch(apiUrl, apiOptions);
+                } else {
+                    data = await fetch(apiUrl);
+                }
+                data = await data.json();
+                let newData;
+                if (this.afterAutofetch) {
+                    newData = this.afterAutofetch(this.#renderState, data)
+
+                } else {
+                    newData = data
+                }
+                const newDataLength = newData.length
+
+                if (this.#fetchedDataLength) {
+
+                    if (newDataLength >= this.#fetchedDataLength) {
+
+                        this.autoFetch = true;
+                    } else {
+                        this.autoFetch = false
+                    }
+                }
+
+                if (this.#renderState == "main") {
+                    this.#data = this.#data.concat(newData);
+                    this.#renderData = this.#data;
+                } else {
+                    this.#renderData = this.#renderData.concat(newData);
+                }
+
+                if (!this.autoloaded) {
+                    this.#rendering(false);
+                    this.autoloaded = true;
+                    if (this.#renderState == "main") {
+                        this.#currentPage[this.#view]++;
+                    } else {
+                        this.#searchCurrentPage++;
+                    }
+                }
+
+                if (this.#renderState == 'main') {
+                    this.#totalPages = this.#calculateTotalPages();
+                    this.dataLength += newDataLength
+
+                } else {
+                    this.#searchTotalPages = this.#calculateTotalPages();
+                }
+            } catch (error) {
+                if (this.afterAutofetch) {
+                    this.afterAutofetch(this.#renderState, error)
+                }
+                this.errors.push(error)
+            }
+        }
+    }
+
+    #rendering(newInsert = true) {
+        if (this.#debug && this.errors.length > 0) { return; }
+        let itemHtml;
+        let firstRow;
+        let lastRow;
+        if (this.#renderState == "main") {
+            if (newInsert) {
+                firstRow = this.#firstRenderRow[this.#view];
+            } else {
+                firstRow = this.#lastRenderRow[this.#view];
+                if (firstRow > 0) {
+                    firstRow = ++this.#lastRenderRow[this.#view];
+                }
+            }
+            lastRow = this.#lastRenderRow[this.#view];
+        } else if (this.#renderState == "search") {
+
+            if (newInsert) {
+                firstRow = this.#searchFirstRenderRow;
+            } else {
+                firstRow = this.#searchLastRenderRow;
+                if (firstRow > 0) {
+                    firstRow = ++this.#searchLastRenderRow;
+                }
+            }
+            lastRow = this.#searchLastRenderRow;
+        }
+
+        if (this.#view == "grid") {
+            if (this.#gridItemHtml == null) { this.#errors.push("Please Set Grid Item Template First."); return null; }
+            itemHtml = this.#gridItemHtml;
+        } else if (this.#view == "list") {
+            if (this.#listItemHtml == null) { this.#errors.push("Please Set List Item Template First."); return null; }
+            itemHtml = this.#listItemHtml;
+        } else if (this.#view == "table") {
+            if (this.#tableRowHtml == null) { this.#errors.push("Please Set Table Row Template First."); return null; }
+            itemHtml = this.#tableRowHtml;
+        }
+        let numberOfRows = this.#perLoad + lastRow;
+        let index;
+
+        const fragment = document.createDocumentFragment();
+        const element = document.createElement("tbody");
+        for (index = firstRow; index < numberOfRows; index++) {
+            if (this.#renderData[index] == undefined) { break; }
+            element.insertAdjacentHTML("beforeend", this.#templator.parseOnEveryRow(itemHtml, this.#renderData[index], index));
+            fragment.appendChild(element.firstChild);
+        }
+
+        if (this.#renderState == "search") {
+            this.#searchLastRenderRow = --index;
+        } else {
+            this.#lastRenderRow[this.#view] = --index;
+        }
+
+        let container = this.#viewContainer
+        if (this.#view == "table") {
+            container = container.tBodies[0]
+        }
+
+        if (this.#loading == "placeholder") {
+            // remove the element which have placeholder-item class
+            container.querySelectorAll(".placeholder-item").forEach((element) => {
+                element.remove();
+            });
+            // remove placeholder tag/element if exists
+            fragment.querySelectorAll("placeholder").forEach((element) => {
+                element.remove();
+            });
+        }
+
+        if (newInsert) {
+            container.innerHTML = "";
+            container.appendChild(fragment);
+        } else {
+            container.appendChild(fragment);
+        }
+        if (this.afterAutoload) {
+            this.afterAutoload();
+        }
+        setTimeout(() => {
+            if (this.#renderState == 'main') {
+                if (this.#view == "grid") {
+                    this.#reRenderGrid = false;
+                } else if (this.#view == "list") {
+                    this.#reRenderList = false;
+                } else if (this.#view == "table") {
+                    this.#reRenderTable = false;
+                }
+            } else {
+                if (this.#view == "table") {
+                    this.#reRenderTable = true;
+                }
+            }
+            // 
+            const images = document.querySelectorAll(`#${this.#viewContainer.id} img[data-renderize-loadimg]`);
+            const length = images.length;
+            for (let index = 0; index < length; index++) {
+                this.#imgObserver.observe(images[index]);
+            }
+            if (this.autoload) {
+                if (this.#view == "table") {
+                    const childArr = Array.from(this.#viewContainer.rows)
+                    if (childArr.at(-this.#autoloadWhen)) {
+                        this.#autoloadObserver.observe(childArr.at(-this.#autoloadWhen));
+                    } else {
+                        this.#autoloadObserver.observe(childArr.at(-1));
+                    }
+                } else {
+                    const childArr = Array.from(this.#viewContainer.children)
+                    if (childArr.at(-this.#autoloadWhen)) {
+                        this.#autoloadObserver.observe(childArr.at(-this.#autoloadWhen));
+                    } else if (childArr.at(-1)) {
+                        this.#autoloadObserver.observe(childArr.at(-1));
+                    }
+                }
+            }
+
+        }, 70);
+
+        if (this.autoFetch) {
+            setTimeout(() => {
+
+                this.#fetchData()
+            }, 110);
+        }
+        if (this.inSelection) {
+            setTimeout(() => {
+                this.#setupSelection(firstRow, numberOfRows);
+            }, 80);
+        }
+    }
+
     #searchContainerConfig(View = null) {
         if (this.#viewContainer.id == this.#gridContainer.id || View == "grid") {
             this.#searchContainer.style.gap = this.#gridGap;
@@ -891,14 +1172,14 @@ class AutoLoad {
             Container.style.gridTemplateColumns = `repeat(${numberOfRows},${this.#gridItemWidth})`
         }
         // 
-        if (document.getElementById("DataViewStyle") == null) {
+        if (document.getElementById("RenderizeStyle") == null) {
             const styleTag = document.createElement("style");
-            styleTag.id = 'DataViewStyle';
+            styleTag.id = 'RenderizeStyle';
             styleTag.textContent += style
             this.#mainContainer.append(styleTag);
 
         } else {
-            document.getElementById("DataViewStyle").textContent += style
+            document.getElementById("RenderizeStyle").textContent += style
         }
     }
     #listStyle(Container = this.#listContainer) {
@@ -926,14 +1207,14 @@ class AutoLoad {
             Container.style.gridTemplateColumns = `repeat(${numberOfRows},${this.#listItemWidth})`
         }
         // 
-        if (document.getElementById("DataViewStyle") == null) {
+        if (document.getElementById("RenderizeStyle") == null) {
             const styleTag = document.createElement("style");
-            styleTag.id = 'DataViewStyle';
+            styleTag.id = 'RenderizeStyle';
             styleTag.textContent += style
             this.#mainContainer.append(styleTag);
 
         } else {
-            document.getElementById("DataViewStyle").textContent += style
+            document.getElementById("RenderizeStyle").textContent += style
         }
     }
     #calculateTotalPages() {
@@ -1029,9 +1310,9 @@ class Templator {
                 element += ` style="width:100%;height:100%;visibility:hidden;">`
             }
             element = element.replace(/src=('|")(.*?)('|")/, (Match, Extra, Value) => {
-                return `data-view-loadimg="${Value}"`
+                return `data-renderize-loadimg="${Value}"`
             })
-            let parent = `<div style="${width}height:${height};background:${this.#lazyloadImageColor};">${element}</div>`
+            let parent = `<div style="${width}height:${height};background:${this.#lazyloadImageColor};" data-renderize-lazyload>${element}</div>`
             return parent;
         });
         return renderedTemplate
@@ -1056,7 +1337,7 @@ class Templator {
             const [type, others, formatterDynamic] = placeholders.split(":")
             const [name, formatter] = others != undefined ? others.split("|") : ""
             switch (type) {
-                case "counter": 
+                case "counter":
                     return NumberOfRow + 1
                 case "column":
                     const subKey = name.match(/\[([^)]+)\]/)
@@ -1064,12 +1345,12 @@ class Templator {
                     if (subKey) {
                         columnValue = Data[name.slice(0, subKey?.index)];
                         columnValue = columnValue ? columnValue[subKey[1]] : columnValue;
-                    }else{
+                    } else {
                         columnValue = Data[name]
                     }
                     if (columnValue == undefined) { return ''; }
                     if (this.#formatters[formatter]) {
-                        return this.#formatters[formatter](columnValue,formatterDynamic);
+                        return this.#formatters[formatter](columnValue, formatterDynamic);
                     } else {
                         return columnValue;
                     }
@@ -1093,3 +1374,4 @@ class Templator {
     }
 }
 module.exports = AutoLoad
+// export default AutoLoad
